@@ -125,6 +125,11 @@ export function generatePlayer(
     pointsHistory: [],
     yearPoints: 0,
     yearStartRanking: 0,
+    yearHistory: [],
+    bestRanking: 999,
+    weeksAtNo1: 0,
+    yearTitles: 0,
+    yearGS: 0,
   };
 }
 
@@ -176,6 +181,8 @@ export function refreshPlayerSkillsForYear(player: Player): void {
   player.morale = 65;
   player.stamina = player.baseStaminaMax;
   player.yearPoints = 0;
+  player.yearTitles = 0;
+  player.yearGS = 0;
 }
 
 // Rarity label/color helpers

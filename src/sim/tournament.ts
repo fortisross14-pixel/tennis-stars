@@ -20,7 +20,7 @@ export function watchedPlan(tier: TournamentTier): UserWatchedPlan {
     case 'M1000': return { showFullBracket: true,  liveFinal: true, liveSemis: false };
     case 'WTF':   return { showFullBracket: true,  liveFinal: true, liveSemis: true };
     case 'T500':
-    case 'T250':  return { showFullBracket: false, liveFinal: true, liveSemis: false };
+    case 'T250':  return { showFullBracket: false, liveFinal: false, liveSemis: false };
   }
 }
 
@@ -276,7 +276,8 @@ export function applyTournamentEffects(
   }
   const champ = players.find(p => p.id === winnerId)!;
   champ.careerTitles++;
-  if (t.tier === 'GS') champ.careerGS++;
+  champ.yearTitles++;
+  if (t.tier === 'GS') { champ.careerGS++; champ.yearGS++; }
   if (t.tier === 'M1000') champ.careerM1000++;
 
   return { winnerId, runnerUpId, finalScore };

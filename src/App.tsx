@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { GameState, Tournament, YearSummary } from './sim/types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { GameState, Tournament, YearSummary, Player } from './sim/types';
 import { initGameState, advanceWeek, isOffseasonWeek } from './sim/engine';
 import { buildCalendarForYear, tournamentsStartingInWeek, tournamentsInWeek } from './sim/calendar';
 import { runOffseason } from './sim/offseason';
@@ -8,28 +8,77 @@ import { RankingView } from './ui/RankingView';
 import { HistoryView } from './ui/HistoryView';
 import { TournamentRunner } from './ui/TournamentRunner';
 import { OffseasonView } from './ui/OffseasonView';
+import { HomeScreen } from './ui/HomeScreen';
+import { PlayerModal } from './ui/PlayerModal';
+import { TournamentModal } from './ui/TournamentModal';
 import { Flag } from './ui/common';
+import { loadSlot, saveSlot } from './sim/save';
 
 type Tab = 'current' | 'ranking' | 'calendar' | 'history';
 
 export default function App() {
-  const [state, setState] = useState<GameState>(() => initGameState());
+  // Slot management: null = at home screen
+  const [activeSlot, setActiveSlot] = useState<1 | 2 | 3 | null>(null);
+  const [state, setState] = useState<GameState | null>(null);
   const [tab, setTab] = useState<Tab>('current');
   const [activeTournament, setActiveTournament] = useState<Tournament | null>(null);
   const [offseasonSummary, setOffseasonSummary] = useState<YearSummary | null>(null);
 
-  const inWeek = useMemo(
-    () => tournamentsInWeek(state.calendar, state.currentWeek),
-    [state.calendar, state.currentWeek],
-  );
-  const featuredThisWeek = useMemo(() => {
+  // Modal state
+  const [playerModal, setPlayerModal] = useState<Player | null>(null);
+  const [tournamentModal, setTournamentModal] = useState<Tournament | null>(null);
+
+  // Autosave whenever state changes (debounced via the natural re-render cadence)
+  useEffect(() => {
+    if (activeSlot && state) {
+      saveSlot(activeSlot, state);
+    }
+  }, [activeSlot, state]);
+
+  const openPlayer = useCallback((p: Player) => setPlayerModal(p), []);
+  const openTournament = useCallback((t: Tournament) => setTournamentModal(t), []);
+
+  // === HOME SCREEN ===
+  if (!state || !activeSlot) {
+    return (
+      <HomeScreen
+        onNewGame={(slotId) => {
+          const fresh = initGameState();
+          setActiveSlot(slotId);
+          setState(fresh);
+          setTab('current');
+          setActiveTournament(null);
+          setOffseasonSummary(null);
+        }}
+        onContinue={(slotId) => {
+          const saved = loadSlot(slotId);
+          if (saved) {
+            setActiveSlot(slotId);
+            setState(saved.state);
+            setTab('current');
+            setActiveTournament(null);
+            setOffseasonSummary(null);
+          }
+        }}
+      />
+    );
+  }
+
+  // ===== IN-GAME =====
+  const inWeek = tournamentsInWeek(state.calendar, state.currentWeek);
+  const featuredThisWeek = (() => {
     const starting = tournamentsStartingInWeek(state.calendar, state.currentWeek);
     if (starting.length === 0) return null;
-    const tierOrder: Record<string, number> = { GS: 5, WTF: 4, M1000: 3, T500: 2, T250: 1 };
-    return [...starting]
-      .filter(t => !t.winnerId)
-      .sort((a, b) => tierOrder[b.tier] - tierOrder[a.tier])[0] ?? null;
-  }, [state.calendar, state.currentWeek]);
+    return starting.filter(t => !t.winnerId)[0] || null;
+  })();
+
+  const goHome = () => {
+    if (activeSlot && state) saveSlot(activeSlot, state); // final save
+    setActiveSlot(null);
+    setState(null);
+    setActiveTournament(null);
+    setOffseasonSummary(null);
+  };
 
   const handleAdvance = () => {
     if (isOffseasonWeek(state.currentWeek + 1)) {
@@ -65,71 +114,68 @@ export default function App() {
     setOffseasonSummary(null);
   };
 
-  // Offseason
+  // Offseason wizard
   if (offseasonSummary) {
     return (
       <>
-        <Masthead state={state} />
+        <Masthead state={state} onHome={goHome} />
         <main>
           <OffseasonView state={state} summary={offseasonSummary} onDone={handleStartNewYear} />
         </main>
+        <PlayerModal player={playerModal} state={state} onClose={() => setPlayerModal(null)} />
+        <TournamentModal
+          tournament={tournamentModal}
+          state={state}
+          onClose={() => setTournamentModal(null)}
+          onPlayerClick={openPlayer}
+        />
       </>
     );
   }
 
-  // Active tournament
+  // Tournament runner
   if (activeTournament) {
     return (
       <>
-        <Masthead state={state} />
+        <Masthead state={state} onHome={goHome} />
         <main>
           <TournamentRunner
             state={state}
-            setState={s => setState(s)}
+            setState={setState}
             tournament={activeTournament}
+            onPlayerClick={openPlayer}
             onClose={() => {
               setActiveTournament(null);
               const tourEndWeek = activeTournament.weekOfYear + activeTournament.durationWeeks - 1;
               const newAbs = (state.year - 1) * 52 + tourEndWeek;
-              setState(prev => ({
+              setState(prev => prev ? ({
                 ...prev,
                 currentWeek: tourEndWeek,
                 absoluteWeek: newAbs,
-              }));
+              }) : prev);
             }}
           />
         </main>
+        <PlayerModal player={playerModal} state={state} onClose={() => setPlayerModal(null)} />
       </>
     );
   }
 
   return (
     <>
-      <Masthead state={state} />
+      <Masthead state={state} onHome={goHome} />
       <div className="nav-wrap">
         <nav className="nav">
-          <button
-            className={`nav-tab ${tab === 'current' ? 'active' : ''}`}
-            onClick={() => setTab('current')}
-          >
+          <button className={`nav-tab ${tab === 'current' ? 'active' : ''}`} onClick={() => setTab('current')}>
             This Week
           </button>
-          <button
-            className={`nav-tab ${tab === 'ranking' ? 'active' : ''}`}
-            onClick={() => setTab('ranking')}
-          >
+          <button className={`nav-tab ${tab === 'ranking' ? 'active' : ''}`} onClick={() => setTab('ranking')}>
             Rankings
           </button>
-          <button
-            className={`nav-tab ${tab === 'calendar' ? 'active' : ''}`}
-            onClick={() => setTab('calendar')}
-          >
+          <button className={`nav-tab ${tab === 'calendar' ? 'active' : ''}`} onClick={() => setTab('calendar')}>
             Calendar
           </button>
-          <button
-            className={`nav-tab ${tab === 'history' ? 'active' : ''}`}
-            onClick={() => setTab('history')}
-          >
+          <button className={`nav-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
             History
           </button>
         </nav>
@@ -142,21 +188,31 @@ export default function App() {
             inWeek={inWeek}
             onAdvance={handleAdvance}
             onEnterTournament={handleEnterTournament}
+            onPlayerClick={openPlayer}
+            onTournamentClick={openTournament}
           />
         )}
-        {tab === 'ranking' && <RankingView state={state} setState={setState} />}
-        {tab === 'calendar' && <CalendarView state={state} />}
-        {tab === 'history' && <HistoryView state={state} />}
+        {tab === 'ranking' && <RankingView state={state} setState={setState} onPlayerClick={openPlayer} />}
+        {tab === 'calendar' && <CalendarView state={state} onTournamentClick={openTournament} />}
+        {tab === 'history' && <HistoryView state={state} onPlayerClick={openPlayer} onTournamentClick={openTournament} />}
       </main>
+
+      <PlayerModal player={playerModal} state={state} onClose={() => setPlayerModal(null)} />
+      <TournamentModal
+        tournament={tournamentModal}
+        state={state}
+        onClose={() => setTournamentModal(null)}
+        onPlayerClick={(p) => { setTournamentModal(null); openPlayer(p); }}
+      />
     </>
   );
 }
 
-function Masthead({ state }: { state: GameState }) {
+function Masthead({ state, onHome }: { state: GameState; onHome: () => void }) {
   const active = state.players.filter(p => !p.retired).length;
   return (
     <header className="masthead">
-      <h1 className="mast-title">
+      <h1 className="mast-title" onClick={onHome} style={{ cursor: 'pointer' }} title="Back to home">
         <span className="mast-title-mark">TS</span>
         Tennis Stars
       </h1>
@@ -169,17 +225,15 @@ function Masthead({ state }: { state: GameState }) {
 }
 
 function CurrentWeekView({
-  state,
-  featured,
-  inWeek,
-  onAdvance,
-  onEnterTournament,
+  state, featured, inWeek, onAdvance, onEnterTournament, onPlayerClick, onTournamentClick,
 }: {
   state: GameState;
   featured: Tournament | null;
   inWeek: Tournament[];
   onAdvance: () => void;
   onEnterTournament: () => void;
+  onPlayerClick: (p: Player) => void;
+  onTournamentClick: (t: Tournament) => void;
 }) {
   const isOffseason = state.currentWeek >= 46;
   return (
@@ -208,7 +262,9 @@ function CurrentWeekView({
           <h2 className="section-title">This week on tour</h2>
           <hr className="rule" />
           {inWeek.map(t => (
-            <TournamentCardView key={t.id} state={state} t={t} />
+            <div key={t.id} onClick={() => onTournamentClick(t)} style={{ cursor: 'pointer' }}>
+              <TournamentCardView state={state} t={t} onPlayerClick={onPlayerClick} />
+            </div>
           ))}
         </>
       )}
@@ -220,13 +276,19 @@ function CurrentWeekView({
       )}
 
       <div style={{ marginTop: 30 }}>
-        <NextUpcoming state={state} />
+        <NextUpcoming state={state} onTournamentClick={onTournamentClick} />
       </div>
     </div>
   );
 }
 
-function TournamentCardView({ state, t }: { state: GameState; t: Tournament }) {
+function TournamentCardView({
+  state, t, onPlayerClick,
+}: {
+  state: GameState;
+  t: Tournament;
+  onPlayerClick: (p: Player) => void;
+}) {
   const played = !!t.winnerId;
   const winner = played ? state.players.find(p => p.id === t.winnerId) : null;
   const ru = played ? state.players.find(p => p.id === t.runnerUpId) : null;
@@ -245,32 +307,24 @@ function TournamentCardView({ state, t }: { state: GameState; t: Tournament }) {
       {played && winner && ru && (
         <div
           style={{
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: '1px solid var(--rule)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
-            fontSize: 14,
+            marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--rule)',
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 14,
           }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: 'var(--ink-soft)',
-            }}
-          >
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-soft)' }}>
             Champion
           </span>
           <Flag iso2={winner.iso2} />
-          <strong>{winner.firstName} {winner.surname}</strong>
+          <button className="link-name" onClick={() => onPlayerClick(winner)}>
+            <strong>{winner.firstName} {winner.surname}</strong>
+          </button>
           <span style={{ color: 'var(--cyan)', fontWeight: 700 }}>{t.finalScore}</span>
-          <span style={{ color: 'var(--ink-mid)' }}>
-            <Flag iso2={ru.iso2} size="sm" /> {ru.firstName.charAt(0)}. {ru.surname}
+          <span style={{ color: 'var(--ink-mid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Flag iso2={ru.iso2} size="sm" />
+            <button className="link-name link-name-soft" onClick={() => onPlayerClick(ru)}>
+              {ru.firstName.charAt(0)}. {ru.surname}
+            </button>
           </span>
         </div>
       )}
@@ -305,7 +359,7 @@ function OffseasonPlaceholder({ state, onAdvance }: { state: GameState; onAdvanc
   );
 }
 
-function NextUpcoming({ state }: { state: GameState }) {
+function NextUpcoming({ state, onTournamentClick }: { state: GameState; onTournamentClick: (t: Tournament) => void }) {
   const upcoming = state.calendar
     .filter(t => t.weekOfYear > state.currentWeek && t.weekOfYear <= state.currentWeek + 4)
     .sort((a, b) => a.weekOfYear - b.weekOfYear);
@@ -313,35 +367,21 @@ function NextUpcoming({ state }: { state: GameState }) {
   return (
     <div>
       <div className="section-kicker">On the horizon</div>
-      <h2 className="section-title" style={{ fontSize: 20, marginBottom: 12 }}>
-        Coming up
-      </h2>
+      <h2 className="section-title" style={{ fontSize: 20, marginBottom: 12 }}>Coming up</h2>
       <hr className="rule" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
         {upcoming.map(t => (
           <div
             key={t.id}
+            onClick={() => onTournamentClick(t)}
             style={{
-              padding: '14px 16px',
-              border: '1px solid var(--rule)',
-              borderRadius: 8,
-              background: 'white',
-              borderLeft: `4px solid ${
-                t.surface === 'hard' ? 'var(--hard)' : t.surface === 'clay' ? 'var(--clay)' : 'var(--grass)'
-              }`,
-              boxShadow: 'var(--shadow-card)',
+              padding: '14px 16px', border: '1px solid var(--rule)', borderRadius: 8,
+              background: 'white', boxShadow: 'var(--shadow-card)',
+              borderLeft: `4px solid ${t.surface === 'hard' ? 'var(--hard)' : t.surface === 'clay' ? 'var(--clay)' : 'var(--grass)'}`,
+              cursor: 'pointer',
             }}
           >
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: 'var(--ink-soft)',
-                marginBottom: 4,
-              }}
-            >
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-soft)', marginBottom: 4 }}>
               Wk {t.weekOfYear} · {t.tier}
             </div>
             <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{t.name}</div>

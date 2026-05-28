@@ -43,22 +43,34 @@ export function PlayerCell({
   showAvatar = true,
   showCountryCode = false,
   nameStyle = 'short',
+  onClick,
+  rank,
 }: {
   player: Player;
   showAvatar?: boolean;
   showCountryCode?: boolean;
   nameStyle?: 'short' | 'full' | 'last';
+  onClick?: (p: Player) => void;
+  rank?: number;
 }) {
   let displayName: string;
   if (nameStyle === 'full') displayName = `${player.firstName} ${player.surname}`;
   else if (nameStyle === 'last') displayName = player.surname;
   else displayName = `${player.firstName.charAt(0)}. ${player.surname}`;
 
+  const clickable = !!onClick;
+  const handleClick = clickable ? () => onClick!(player) : undefined;
   return (
-    <span className="player-cell">
+    <span
+      className={`player-cell ${clickable ? 'is-clickable' : ''}`}
+      onClick={handleClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+    >
       {showAvatar && <Avatar player={player} size="sm" />}
       <Flag iso2={player.iso2} size="md" />
-      <span className="pname">{displayName}</span>
+      <span className={`pname ${clickable ? 'is-clickable' : ''}`}>{displayName}</span>
+      {rank !== undefined && <span className="rank-tag">(#{rank})</span>}
       {showCountryCode && (
         <span style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 600 }}>
           ({player.countryCode})

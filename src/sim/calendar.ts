@@ -28,66 +28,57 @@ interface TemplateEntry {
 }
 
 const TEMPLATE: TemplateEntry[] = [
-  // ===== HARD-COURT SUMMER START =====
-  // 250s leading in
-  { name: 'Brisbane Open', tier: 'T250', surface: 'hard', week: 1, duration: 1 },
-  { name: 'Adelaide Open', tier: 'T250', surface: 'hard', week: 2, duration: 1 },
-  // GS: Australian Open
-  { name: 'Australian Open', tier: 'GS', surface: 'hard', week: 3, duration: 2 },
-  // post-AO 500/250
-  { name: 'Rotterdam 500', tier: 'T500', surface: 'hard', week: 6, duration: 1 },
-  { name: 'Buenos Aires 250', tier: 'T250', surface: 'clay', week: 6, duration: 1 }, // South America clay swing
-  { name: 'Rio Open 500', tier: 'T500', surface: 'clay', week: 7, duration: 1 },
-  { name: 'Dallas 250', tier: 'T250', surface: 'hard', week: 7, duration: 1 },
-  { name: 'Marseille 250', tier: 'T250', surface: 'hard', week: 8, duration: 1 },
-  { name: 'Acapulco 500', tier: 'T500', surface: 'hard', week: 9, duration: 1 },
-  { name: 'Dubai 500', tier: 'T500', surface: 'hard', week: 9, duration: 1 },
-  // Sunshine double M1000
-  { name: 'Indian Wells Masters', tier: 'M1000', surface: 'hard', week: 10, duration: 2 },
-  { name: 'Miami Open Masters', tier: 'M1000', surface: 'hard', week: 12, duration: 2 },
+  // ===== HARD-COURT JANUARY =====
+  { name: 'Brisbane Open',       tier: 'T250',  surface: 'hard',  week: 1,  duration: 1 },
+  { name: 'Adelaide Open',       tier: 'T250',  surface: 'hard',  week: 2,  duration: 1 },
+  // GS: Australian Open (wks 3-4)
+  { name: 'Australian Open',     tier: 'GS',    surface: 'hard',  week: 3,  duration: 2 },
+  // ===== FEB: post-AO + South America clay swing =====
+  { name: 'Rotterdam 500',       tier: 'T500',  surface: 'hard',  week: 5,  duration: 1 },
+  { name: 'Buenos Aires 250',    tier: 'T250',  surface: 'clay',  week: 6,  duration: 1 },
+  { name: 'Rio Open 500',        tier: 'T500',  surface: 'clay',  week: 7,  duration: 1 },
+  { name: 'Marseille 250',       tier: 'T250',  surface: 'hard',  week: 8,  duration: 1 },
+  { name: 'Dubai 500',           tier: 'T500',  surface: 'hard',  week: 9,  duration: 1 },
+  // ===== SUNSHINE DOUBLE (M1000 wk 10-11, 12-13) =====
+  { name: 'Indian Wells Masters', tier: 'M1000', surface: 'hard',  week: 10, duration: 2 },
+  { name: 'Miami Open Masters',  tier: 'M1000', surface: 'hard',  week: 12, duration: 2 },
   // ===== CLAY SEASON =====
-  { name: 'Marrakech 250', tier: 'T250', surface: 'clay', week: 14, duration: 1 },
-  { name: 'Houston 250', tier: 'T250', surface: 'clay', week: 14, duration: 1 },
-  { name: 'Monte Carlo Masters', tier: 'M1000', surface: 'clay', week: 15, duration: 1 },
-  { name: 'Barcelona 500', tier: 'T500', surface: 'clay', week: 16, duration: 1 },
-  { name: 'Munich 500', tier: 'T500', surface: 'clay', week: 17, duration: 1 },
-  { name: 'Madrid Masters', tier: 'M1000', surface: 'clay', week: 18, duration: 1 },
-  { name: 'Italian Open Masters', tier: 'M1000', surface: 'clay', week: 19, duration: 1 },
-  { name: 'Geneva 250', tier: 'T250', surface: 'clay', week: 20, duration: 1 },
-  // Roland Garros
-  { name: 'Roland Garros', tier: 'GS', surface: 'clay', week: 21, duration: 2 },
+  { name: 'Marrakech 250',       tier: 'T250',  surface: 'clay',  week: 14, duration: 1 },
+  { name: 'Monte Carlo Masters', tier: 'M1000', surface: 'clay',  week: 15, duration: 1 },
+  { name: 'Barcelona 500',       tier: 'T500',  surface: 'clay',  week: 16, duration: 1 },
+  { name: 'Munich 500',          tier: 'T500',  surface: 'clay',  week: 17, duration: 1 },
+  { name: 'Madrid Masters',      tier: 'M1000', surface: 'clay',  week: 18, duration: 1 },
+  { name: 'Italian Open Masters', tier: 'M1000', surface: 'clay',  week: 19, duration: 1 },
+  { name: 'Geneva 250',          tier: 'T250',  surface: 'clay',  week: 20, duration: 1 },
+  // Roland Garros (wks 21-22)
+  { name: 'Roland Garros',       tier: 'GS',    surface: 'clay',  week: 21, duration: 2 },
   // ===== GRASS SEASON =====
-  { name: 'Stuttgart 250', tier: 'T250', surface: 'grass', week: 23, duration: 1 },
-  { name: 'Halle 500', tier: 'T500', surface: 'grass', week: 24, duration: 1 },
-  { name: 'Queens Club 500', tier: 'T500', surface: 'grass', week: 24, duration: 1 },
-  { name: 'Eastbourne 250', tier: 'T250', surface: 'grass', week: 25, duration: 1 },
-  { name: 'Mallorca 250', tier: 'T250', surface: 'grass', week: 25, duration: 1 },
-  // Wimbledon
-  { name: 'Wimbledon', tier: 'GS', surface: 'grass', week: 26, duration: 2 },
-  // ===== POST-WIMBLEDON HARD =====
-  { name: 'Hamburg 500', tier: 'T500', surface: 'clay', week: 28, duration: 1 },
-  { name: 'Newport 250', tier: 'T250', surface: 'grass', week: 28, duration: 1 },
-  { name: 'Atlanta 250', tier: 'T250', surface: 'hard', week: 29, duration: 1 },
-  { name: 'Washington 500', tier: 'T500', surface: 'hard', week: 30, duration: 1 },
+  { name: 'Stuttgart 250',       tier: 'T250',  surface: 'grass', week: 23, duration: 1 },
+  { name: 'Halle 500',           tier: 'T500',  surface: 'grass', week: 24, duration: 1 },
+  { name: 'Queens Club 500',     tier: 'T500',  surface: 'grass', week: 25, duration: 1 },
+  // Wimbledon (wks 26-27)
+  { name: 'Wimbledon',           tier: 'GS',    surface: 'grass', week: 26, duration: 2 },
+  // ===== NORTH AMERICAN HARD SUMMER =====
+  { name: 'Newport 250',         tier: 'T250',  surface: 'grass', week: 28, duration: 1 },
+  { name: 'Atlanta 250',         tier: 'T250',  surface: 'hard',  week: 29, duration: 1 },
+  { name: 'Washington 500',      tier: 'T500',  surface: 'hard',  week: 30, duration: 1 },
   { name: 'Canadian Open Masters', tier: 'M1000', surface: 'hard', week: 31, duration: 1 },
-  { name: 'Cincinnati Masters', tier: 'M1000', surface: 'hard', week: 32, duration: 1 },
-  { name: 'Winston-Salem 250', tier: 'T250', surface: 'hard', week: 33, duration: 1 },
-  // US Open
-  { name: 'US Open', tier: 'GS', surface: 'hard', week: 34, duration: 2 },
-  // ===== ASIAN/EUROPEAN HARD-COURT FALL =====
-  { name: 'Chengdu 250', tier: 'T250', surface: 'hard', week: 37, duration: 1 },
-  { name: 'Tokyo 500', tier: 'T500', surface: 'hard', week: 38, duration: 1 },
-  { name: 'Beijing 500', tier: 'T500', surface: 'hard', week: 38, duration: 1 },
-  { name: 'Shanghai Masters', tier: 'M1000', surface: 'hard', week: 39, duration: 1 },
-  { name: 'Stockholm 250', tier: 'T250', surface: 'hard', week: 41, duration: 1 },
-  { name: 'Antwerp 250', tier: 'T250', surface: 'hard', week: 41, duration: 1 },
-  { name: 'Vienna 500', tier: 'T500', surface: 'hard', week: 42, duration: 1 },
-  { name: 'Basel 500', tier: 'T500', surface: 'hard', week: 42, duration: 1 },
-  { name: 'Paris Masters', tier: 'M1000', surface: 'hard', week: 43, duration: 1 },
-  { name: 'Metz 250', tier: 'T250', surface: 'hard', week: 44, duration: 1 },
-  { name: 'Belgrade 250', tier: 'T250', surface: 'hard', week: 44, duration: 1 },
-  // WTF
-  { name: 'World Tour Finals', tier: 'WTF', surface: 'hard', week: 45, duration: 1 },
+  { name: 'Cincinnati Masters',  tier: 'M1000', surface: 'hard',  week: 32, duration: 1 },
+  { name: 'Winston-Salem 250',   tier: 'T250',  surface: 'hard',  week: 33, duration: 1 },
+  // US Open (wks 34-35)
+  { name: 'US Open',             tier: 'GS',    surface: 'hard',  week: 34, duration: 2 },
+  // ===== ASIAN/EUROPEAN HARD FALL =====
+  { name: 'Chengdu 250',         tier: 'T250',  surface: 'hard',  week: 36, duration: 1 },
+  { name: 'Tokyo 500',           tier: 'T500',  surface: 'hard',  week: 37, duration: 1 },
+  { name: 'Beijing 500',         tier: 'T500',  surface: 'hard',  week: 38, duration: 1 },
+  { name: 'Shanghai Masters',    tier: 'M1000', surface: 'hard',  week: 39, duration: 1 },
+  { name: 'Stockholm 250',       tier: 'T250',  surface: 'hard',  week: 40, duration: 1 },
+  { name: 'Vienna 500',          tier: 'T500',  surface: 'hard',  week: 41, duration: 1 },
+  { name: 'Basel 500',           tier: 'T500',  surface: 'hard',  week: 42, duration: 1 },
+  { name: 'Paris Masters',       tier: 'M1000', surface: 'hard',  week: 43, duration: 1 },
+  { name: 'Metz 250',            tier: 'T250',  surface: 'hard',  week: 44, duration: 1 },
+  // WTF (wk 45) and then offseason
+  { name: 'World Tour Finals',   tier: 'WTF',   surface: 'hard',  week: 45, duration: 1 },
   // (weeks 46-52 = offseason)
 ];
 

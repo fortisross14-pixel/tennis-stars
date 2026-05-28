@@ -25,10 +25,20 @@ export function initGameState(): GameState {
   };
 }
 
+// Update each active player's best ranking + weeks-at-#1 based on current ranking
+export function updateRankingMilestones(state: GameState): void {
+  const ranked = rankPlayers(state.players, 'rolling52', state.absoluteWeek);
+  for (let i = 0; i < ranked.length; i++) {
+    const p = ranked[i];
+    const rank = i + 1;
+    if (rank < p.bestRanking) p.bestRanking = rank;
+    if (rank === 1) p.weeksAtNo1++;
+  }
+}
+
 // Advance to next week — returns the new state and any tournaments starting that week
 export function advanceWeek(state: GameState): { state: GameState; startingTournaments: Tournament[] } {
   // Recover stamina for players who didn't play this week
-  // (Since we'll only call advanceWeek when no tournament is active, all players rest.)
   for (const p of state.players) {
     if (!p.retired) restWeekRecover(p);
   }
@@ -39,6 +49,8 @@ export function advanceWeek(state: GameState): { state: GameState; startingTourn
     currentWeek: newWeek,
     absoluteWeek: newAbs,
   };
+  // Track ranking milestones each week
+  updateRankingMilestones(nextState);
   const starting = tournamentsStartingInWeek(state.calendar, newWeek);
   return { state: nextState, startingTournaments: starting };
 }

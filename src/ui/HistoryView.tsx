@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { GameState, Player } from '../sim/types';
+import { GameState, Player, Tournament } from '../sim/types';
 import { PlayerCell, RarityPill, Flag } from './common';
 
-export function HistoryView({ state }: { state: GameState }) {
+export function HistoryView({
+  state,
+  onPlayerClick,
+  onTournamentClick,
+}: {
+  state: GameState;
+  onPlayerClick: (p: Player) => void;
+  onTournamentClick: (t: Tournament) => void;
+}) {
   const [sub, setSub] = useState<'players' | 'tournaments'>('players');
   return (
     <div>
@@ -16,7 +24,11 @@ export function HistoryView({ state }: { state: GameState }) {
           Tournaments
         </button>
       </div>
-      {sub === 'players' ? <PlayersHistory state={state} /> : <TournamentsHistory state={state} />}
+      {sub === 'players' ? (
+        <PlayersHistory state={state} onPlayerClick={onPlayerClick} />
+      ) : (
+        <TournamentsHistory state={state} onPlayerClick={onPlayerClick} onTournamentClick={onTournamentClick} />
+      )}
     </div>
   );
 }
@@ -30,7 +42,7 @@ type SortKey =
   | 'gs'
   | 'm1000';
 
-function PlayersHistory({ state }: { state: GameState }) {
+function PlayersHistory({ state, onPlayerClick }: { state: GameState; onPlayerClick: (p: Player) => void }) {
   const [filter, setFilter] = useState<'active' | 'retired' | 'all'>('all');
   const [sort, setSort] = useState<SortKey>('points');
 
@@ -86,7 +98,7 @@ function PlayersHistory({ state }: { state: GameState }) {
             <tr key={p.id}>
               <td className="rank-num">{i + 1}</td>
               <td>
-                <PlayerCell player={p} />
+                <PlayerCell player={p} onClick={onPlayerClick} />
               </td>
               <td>
                 <RarityPill rarity={p.rarity} />
@@ -159,7 +171,13 @@ function winPctStr(p: Player): string {
   return `${((p.careerMatchesWon / p.careerMatchesPlayed) * 100).toFixed(1)}%`;
 }
 
-function TournamentsHistory({ state }: { state: GameState }) {
+function TournamentsHistory({
+  state, onPlayerClick, onTournamentClick,
+}: {
+  state: GameState;
+  onPlayerClick: (p: Player) => void;
+  onTournamentClick: (t: Tournament) => void;
+}) {
   // Unique tournament names across history
   const allTournamentNames = Array.from(new Set([
     ...state.calendar.map(t => t.name),
@@ -172,85 +190,77 @@ function TournamentsHistory({ state }: { state: GameState }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <label
           style={{
             fontSize: 11,
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            marginRight: 12,
             color: 'var(--ink-soft)',
           }}
         >
           Tournament
         </label>
-        <select
-          value={selected}
-          onChange={e => setSelected(e.target.value)}
-        >
+        <select value={selected} onChange={e => setSelected(e.target.value)}>
           {allTournamentNames.map(n => (
             <option key={n} value={n}>{n}</option>
           ))}
         </select>
+        {selected && (() => {
+          const t = state.calendar.find(tt => tt.name === selected);
+          return t ? (
+            <button className="btn btn-outline" onClick={() => onTournamentClick(t)} style={{ padding: '6px 14px', fontSize: 12 }}>
+              View {selected}
+            </button>
+          ) : null;
+        })()}
       </div>
       {records.length === 0 ? (
         <p style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
           No editions played yet.
         </p>
       ) : (
-        <ol
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-          }}
-        >
-          {records.map(r => (
-            <li
-              key={r.year}
-              style={{
-                padding: '14px 0',
-                borderBottom: '1px solid var(--rule)',
-                display: 'flex',
-                gap: 16,
-                alignItems: 'center',
-                flexWrap: 'wrap',
-              }}
-            >
-              <strong
+        <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {records.map(r => {
+            const winner = state.players.find(p => p.id === r.winnerId);
+            const ru = state.players.find(p => p.id === r.runnerUpId);
+            return (
+              <li
+                key={r.year}
                 style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  color: 'var(--ink-soft)',
-                  minWidth: 70,
+                  padding: '14px 0', borderBottom: '1px solid var(--rule)',
+                  display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap',
                 }}
               >
-                Year {r.year}
-              </strong>
-              <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 14 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                  {(() => {
-                    const winner = state.players.find(p => p.id === r.winnerId);
-                    return winner ? <Flag iso2={winner.iso2} /> : null;
-                  })()}
-                  {r.winnerName}
+                <strong
+                  style={{
+                    fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '0.1em', color: 'var(--ink-soft)', minWidth: 70,
+                  }}
+                >
+                  Year {r.year}
+                </strong>
+                <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 14 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    {winner && <Flag iso2={winner.iso2} />}
+                    <button className="link-name" onClick={() => winner && onPlayerClick(winner)}>
+                      <strong>{r.winnerName}</strong>
+                    </button>
+                  </span>
+                  <span style={{ color: 'var(--cyan)', fontWeight: 700 }}>
+                    {r.scoreLine}
+                  </span>
+                  <span style={{ color: 'var(--ink-mid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {ru && <Flag iso2={ru.iso2} size="sm" />}
+                    <button className="link-name link-name-soft" onClick={() => ru && onPlayerClick(ru)}>
+                      {r.runnerUpName}
+                    </button>
+                  </span>
                 </span>
-                <span style={{ color: 'var(--cyan)', fontWeight: 700 }}>
-                  {r.scoreLine}
-                </span>
-                <span style={{ color: 'var(--ink-mid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {(() => {
-                    const ru = state.players.find(p => p.id === r.runnerUpId);
-                    return ru ? <Flag iso2={ru.iso2} size="sm" /> : null;
-                  })()}
-                  {r.runnerUpName}
-                </span>
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
     </div>

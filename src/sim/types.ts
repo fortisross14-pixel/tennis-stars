@@ -45,6 +45,22 @@ export interface Player {
   yearPoints: number; // calendar year (resets at offseason)
   // results by year for "year summary"
   yearStartRanking: number;
+  // Cross-year history (one entry per finished year, pushed at offseason)
+  yearHistory: PlayerYearRecord[];
+  // Ranking milestones
+  bestRanking: number;  // best (lowest number) ranking ever achieved (default 999)
+  weeksAtNo1: number;   // weeks finishing the week at world #1
+  // Per-year intra-year title tally (resets at offseason)
+  yearTitles: number;
+  yearGS: number;
+}
+
+export interface PlayerYearRecord {
+  year: number;
+  yearPoints: number;
+  eoyRanking: number;
+  titles: number;
+  gs: number;
 }
 
 export interface Tournament {

@@ -46,6 +46,21 @@ export function runOffseason(state: GameState): YearSummary {
     return { tournamentName: name, winnerId: h ? h.winnerId : -1 };
   });
 
+  // === Push per-player year-history snapshot BEFORE we reset yearPoints/yearTitles ===
+  // Use rolling-52 ranking for EOY (more meaningful than calendar)
+  const eoyRanked = rankPlayers(players, 'rolling52', state.absoluteWeek);
+  const eoyRankMap = new Map<number, number>();
+  eoyRanked.forEach((p, i) => eoyRankMap.set(p.id, i + 1));
+  for (const p of active) {
+    p.yearHistory.push({
+      year,
+      yearPoints: p.yearPoints,
+      eoyRanking: eoyRankMap.get(p.id) || 999,
+      titles: p.yearTitles,
+      gs: p.yearGS,
+    });
+  }
+
   // === Retirements ===
   // Decrement yearsRemaining and yearInCareer for all
   const retiredThisYear: number[] = [];

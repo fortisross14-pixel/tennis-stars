@@ -18,7 +18,13 @@ const MONTH_BREAKS: { name: string; startWeek: number; cols: number }[] = [
   { name: 'Dec', startWeek: 48, cols: 5 },
 ];
 
-export function CalendarView({ state }: { state: GameState }) {
+export function CalendarView({
+  state,
+  onTournamentClick,
+}: {
+  state: GameState;
+  onTournamentClick: (t: Tournament) => void;
+}) {
   const [sub, setSub] = useState<'cal' | 'annual'>('cal');
   return (
     <div>
@@ -32,12 +38,20 @@ export function CalendarView({ state }: { state: GameState }) {
           Annual view
         </button>
       </div>
-      {sub === 'cal' ? <ProgramCalendar state={state} /> : <AnnualList state={state} />}
+      {sub === 'cal'
+        ? <ProgramCalendar state={state} onTournamentClick={onTournamentClick} />
+        : <AnnualList state={state} onTournamentClick={onTournamentClick} />}
     </div>
   );
 }
 
-function ProgramCalendar({ state }: { state: GameState }) {
+function ProgramCalendar({
+  state,
+  onTournamentClick,
+}: {
+  state: GameState;
+  onTournamentClick: (t: Tournament) => void;
+}) {
   // 13 columns per row -> 4 rows * 13 = 52
   const rows: number[][] = [];
   for (let r = 0; r < 4; r++) {
@@ -74,7 +88,13 @@ function ProgramCalendar({ state }: { state: GameState }) {
                 <div key={w} className={cls}>
                   <div className="wk-num">Wk {w}</div>
                   {ts.map(t => (
-                    <span key={t.id} className={`cal-tag t-${t.tier} s-${t.surface}`} title={t.name}>
+                    <span
+                      key={t.id}
+                      className={`cal-tag t-${t.tier} s-${t.surface}`}
+                      title={t.name}
+                      onClick={() => onTournamentClick(t)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       {abbr(t.name)}
                     </span>
                   ))}
@@ -127,7 +147,13 @@ function Legend() {
   );
 }
 
-function AnnualList({ state }: { state: GameState }) {
+function AnnualList({
+  state,
+  onTournamentClick,
+}: {
+  state: GameState;
+  onTournamentClick: (t: Tournament) => void;
+}) {
   const sorted = [...state.calendar].sort((a, b) => a.weekOfYear - b.weekOfYear);
   return (
     <table className="table">
@@ -156,7 +182,7 @@ function AnnualList({ state }: { state: GameState }) {
             ? 'NOW'
             : 'UPCOMING';
           return (
-            <tr key={t.id}>
+            <tr key={t.id} onClick={() => onTournamentClick(t)} style={{ cursor: 'pointer' }}>
               <td className="num">{t.weekOfYear}</td>
               <td style={{ fontWeight: 700, color: 'var(--ink)' }}>{t.name}</td>
               <td>

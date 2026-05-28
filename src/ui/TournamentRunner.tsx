@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GameState, Tournament, Player, Round, Match } from '../sim/types';
 import { decideEntries } from '../sim/entries';
+import { rankPlayers } from '../sim/ranking';
 import {
   simulateTournamentAutoRounds,
   appendRoundAndSimulateRest,
@@ -30,11 +31,13 @@ export function TournamentRunner({
   setState,
   tournament,
   onClose,
+  onPlayerClick,
 }: {
   state: GameState;
   setState: (s: GameState) => void;
   tournament: Tournament;
   onClose: () => void;
+  onPlayerClick: (p: Player) => void;
 }) {
   const [entries, setEntries] = useState<Player[] | null>(null);
   const [bracket, setBracket] = useState<Round[] | null>(null);
@@ -42,6 +45,15 @@ export function TournamentRunner({
   const [finalResolved, setFinalResolved] = useState<Match[] | null>(null);
 
   const plan = watchedPlan(tournament.tier);
+
+  // Player-id → current world ranking, computed once for this tournament view.
+  // Used to show rank next to names in seed list & bracket.
+  const rankMap = useMemo(() => {
+    const ranked = rankPlayers(state.players, 'rolling52', state.absoluteWeek);
+    const map = new Map<number, number>();
+    ranked.forEach((p, i) => map.set(p.id, i + 1));
+    return map;
+  }, [state.players, state.absoluteWeek]);
 
   // Build entries + initial auto-simulated bracket once on mount
   useEffect(() => {
@@ -65,26 +77,21 @@ export function TournamentRunner({
         tournament={tournament}
         entries={entries}
         bracket={bracket}
+        rankMap={rankMap}
+        onPlayerClick={onPlayerClick}
         onSimulate={() => {
-          // Determine first manual round (always exists — at minimum, the final)
-          // For T250/T500: only SF + F visible. For M1000: only F live. For GS: SF + F live.
-          // We'll auto-fast-forward to the first manual round (which is the LAST round of `bracket`).
-          // But: if liveSemis, last round in `bracket` should be SF, not F. Let's verify and either way, start with the first match.
           const lastRoundIdx = bracket.length - 1;
-          // If this isn't yet the "manual" round (shouldn't happen because simulateTournamentAutoRounds stops at manual)
           const lastRound = bracket[lastRoundIdx];
+          // T250/T500 are now fully auto-simmed (no live rounds) — go straight to summary
           if (lastRound.matches.length === 0 || lastRound.matches[0].winner) {
-            // already done
             setStage({ kind: 'done' });
             return;
           }
-          // For Masters 1000 / GS we want user to see the FULL pre-filled bracket first.
-          // For T250/T500 we want a special SF+F view.
+          // M1000 / GS: show the pre-filled bracket first
           if (plan.showFullBracket) {
             setStage({ kind: 'bracket' });
           } else {
-            // jump straight to the SF view (we'll show SF + F in the live view layer)
-            startLiveAtFirstUnplayed(bracket, setStage);
+            startLiveAtFirstUnplayed(bracket, tournament, state.players, setStage);
           }
         }}
       />
@@ -97,7 +104,9 @@ export function TournamentRunner({
         tournament={tournament}
         bracket={bracket}
         players={state.players}
-        onContinue={() => startLiveAtFirstUnplayed(bracket, setStage)}
+        rankMap={rankMap}
+        onPlayerClick={onPlayerClick}
+        onContinue={() => startLiveAtFirstUnplayed(bracket, tournament, state.players, setStage)}
       />
     );
   }
@@ -105,10 +114,13 @@ export function TournamentRunner({
   if (stage.kind === 'live') {
     return (
       <LiveMatchView
+        key={`live-${stage.roundIdx}-${stage.matchIdx}`}
         tournament={tournament}
         live={stage.live}
         bracket={bracket}
         players={state.players}
+        rankMap={rankMap}
+        onPlayerClick={onPlayerClick}
         onFinish={resolved => {
           // mark match resolved in bracket
           const updated = [...bracket];
@@ -174,6 +186,8 @@ export function TournamentRunner({
       tournament={tournament}
       bracket={bracket}
       players={state.players}
+      rankMap={rankMap}
+      onPlayerClick={onPlayerClick}
       onCommit={() => {
         // Commit effects, history, and close
         const { winnerId, runnerUpId, finalScore } = applyTournamentEffects(
@@ -208,8 +222,13 @@ export function TournamentRunner({
   );
 }
 
-function startLiveAtFirstUnplayed(bracket: Round[], setStage: (s: Stage) => void): void {
-  // Always: the last round in `bracket` is the first "manual" round.
+function startLiveAtFirstUnplayed(
+  bracket: Round[],
+  tournament: Tournament,
+  players: Player[],
+  setStage: (s: Stage) => void,
+): void {
+  // Last round in `bracket` is the first "manual" round.
   const lastIdx = bracket.length - 1;
   const r = bracket[lastIdx];
   const idx = r.matches.findIndex(m => !m.winner);
@@ -218,9 +237,14 @@ function startLiveAtFirstUnplayed(bracket: Round[], setStage: (s: Stage) => void
     return;
   }
   const m = r.matches[idx];
-  // Players will be resolved by the live view via lookup
-  setStage({ kind: 'live', roundIdx: lastIdx, matchIdx: idx, live: null as any });
-  // ^ but we need actual Player objects; fix below by using a wrapper that passes through global state
+  const p1 = players.find(p => p.id === m.p1)!;
+  const p2 = players.find(p => p.id === m.p2)!;
+  setStage({
+    kind: 'live',
+    roundIdx: lastIdx,
+    matchIdx: idx,
+    live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier)),
+  });
 }
 
 function nextUnfinishedInRound(r: Round): number {
@@ -235,11 +259,15 @@ function TournamentPreview({
   entries,
   bracket,
   onSimulate,
+  rankMap,
+  onPlayerClick,
 }: {
   tournament: Tournament;
   entries: Player[];
   bracket: Round[];
   onSimulate: () => void;
+  rankMap: Map<number, number>;
+  onPlayerClick: (p: Player) => void;
 }) {
   return (
     <div>
@@ -271,7 +299,7 @@ function TournamentPreview({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
           gap: 8,
           marginTop: 10,
         }}
@@ -291,8 +319,8 @@ function TournamentPreview({
               boxShadow: 'var(--shadow-card)',
             }}
           >
-            <span style={{ fontWeight: 700, color: 'var(--cyan)', minWidth: 24, fontSize: 12 }}>#{i + 1}</span>
-            <PlayerCell player={p} />
+            <span className="seed-tag">Seed {i + 1}</span>
+            <PlayerCell player={p} onClick={onPlayerClick} rank={rankMap.get(p.id)} />
           </div>
         ))}
       </div>
@@ -324,11 +352,15 @@ function FullBracketView({
   tournament,
   bracket,
   players,
+  rankMap,
+  onPlayerClick,
   onContinue,
 }: {
   tournament: Tournament;
   bracket: Round[];
   players: Player[];
+  rankMap: Map<number, number>;
+  onPlayerClick: (p: Player) => void;
   onContinue: () => void;
 }) {
   const plan = watchedPlan(tournament.tier);
@@ -347,7 +379,7 @@ function FullBracketView({
       >
         Earlier rounds resolved. You'll watch the {plan.liveSemis ? 'semifinals & final' : 'final'} live.
       </p>
-      <BracketDisplay bracket={bracket} players={players} />
+      <BracketDisplay bracket={bracket} players={players} rankMap={rankMap} onPlayerClick={onPlayerClick} />
       <div style={{ marginTop: 24 }}>
         <button className="btn" onClick={onContinue}>
           Continue to {plan.liveSemis ? 'Semifinals' : 'Final'} →
@@ -357,14 +389,27 @@ function FullBracketView({
   );
 }
 
-function BracketDisplay({ bracket, players }: { bracket: Round[]; players: Player[] }) {
+function BracketDisplay({
+  bracket, players, rankMap, onPlayerClick,
+}: {
+  bracket: Round[];
+  players: Player[];
+  rankMap?: Map<number, number>;
+  onPlayerClick?: (p: Player) => void;
+}) {
   return (
     <div className="bracket-wrap">
       {bracket.map((r, ri) => (
         <div key={ri} className="br-round">
           <div className="br-round-title">{r.name}</div>
           {r.matches.map((m, mi) => (
-            <BracketMatch key={mi} match={m} players={players} />
+            <BracketMatch
+              key={mi}
+              match={m}
+              players={players}
+              rankMap={rankMap}
+              onPlayerClick={onPlayerClick}
+            />
           ))}
         </div>
       ))}
@@ -372,7 +417,14 @@ function BracketDisplay({ bracket, players }: { bracket: Round[]; players: Playe
   );
 }
 
-function BracketMatch({ match, players }: { match: Match; players: Player[] }) {
+function BracketMatch({
+  match, players, rankMap, onPlayerClick,
+}: {
+  match: Match;
+  players: Player[];
+  rankMap?: Map<number, number>;
+  onPlayerClick?: (p: Player) => void;
+}) {
   const p1 = players.find(p => p.id === match.p1)!;
   const p2 = players.find(p => p.id === match.p2)!;
   const w = match.winner;
@@ -380,20 +432,32 @@ function BracketMatch({ match, players }: { match: Match; players: Player[] }) {
     { p: p1, win: w === p1.id, lose: !!w && w !== p1.id },
     { p: p2, win: w === p2.id, lose: !!w && w !== p2.id },
   ];
-  const scoreParts = match.sets ? match.sets.map(s => `${s.p1}-${s.p2}`) : ['—', '—'];
   return (
     <div className="br-match">
-      {sides.map((s, i) => (
-        <div key={i} className={`br-side ${s.win ? 'win' : ''} ${s.lose ? 'lose' : ''}`}>
-          <Flag iso2={s.p.iso2} size="sm" />
-          <span className="pname">{s.p.surname}</span>
-          {match.sets && (
-            <span className="score">
-              {match.sets.map(set => (i === 0 ? set.p1 : set.p2)).join(' ')}
-            </span>
-          )}
-        </div>
-      ))}
+      {sides.map((s, i) => {
+        const rank = rankMap?.get(s.p.id);
+        return (
+          <div key={i} className={`br-side ${s.win ? 'win' : ''} ${s.lose ? 'lose' : ''}`}>
+            <Flag iso2={s.p.iso2} size="sm" />
+            {onPlayerClick ? (
+              <button className="br-pname-btn" onClick={() => onPlayerClick(s.p)}>
+                {s.p.surname}
+                {rank !== undefined && <span className="rank-tag">(#{rank})</span>}
+              </button>
+            ) : (
+              <span className="pname">
+                {s.p.surname}
+                {rank !== undefined && <span className="rank-tag">(#{rank})</span>}
+              </span>
+            )}
+            {match.sets && (
+              <span className="score">
+                {match.sets.map(set => (i === 0 ? set.p1 : set.p2)).join(' ')}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -406,56 +470,44 @@ function LiveMatchView({
   live,
   bracket,
   players,
+  rankMap,
+  onPlayerClick,
   onFinish,
 }: {
   tournament: Tournament;
   live: LiveMatchState | null;
   bracket: Round[];
   players: Player[];
+  rankMap: Map<number, number>;
+  onPlayerClick: (p: Player) => void;
   onFinish: (m: Match) => void;
 }) {
-  // Initialize live state from bracket lookup if `live` is null (means we just routed here without one).
-  const [state, setLive] = useState<LiveMatchState | null>(live);
+  // With the `key` on this component, every new match remounts fresh.
+  // `live` prop is guaranteed to be a real LiveMatchState by the parent.
+  const [state, setLive] = useState<LiveMatchState>(live!);
 
-  // Find the current match from bracket
+  // Find the current round/match from bracket for the round label
   const currentRoundIdx = bracket.findIndex(r => r.matches.some(m => !m.winner));
   const currentRound = currentRoundIdx >= 0 ? bracket[currentRoundIdx] : null;
-  const currentMatchIdx = currentRound ? currentRound.matches.findIndex(m => !m.winner) : -1;
-  const currentMatch = currentRound && currentMatchIdx >= 0 ? currentRound.matches[currentMatchIdx] : null;
-
-  // Initialize if needed
-  useEffect(() => {
-    if (!state && currentMatch) {
-      const p1 = players.find(p => p.id === currentMatch.p1)!;
-      const p2 = players.find(p => p.id === currentMatch.p2)!;
-      setLive(createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Auto-tick games each second
   const tickRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!state) return;
     if (state.matchComplete) return;
     const curSet = state.sets[state.currentSet];
     if (curSet.complete) return; // waiting for Next Set click
     tickRef.current = window.setTimeout(() => {
-      setLive(s => (s ? stepLiveGame(s) : s));
+      setLive(s => stepLiveGame(s));
     }, 900);
     return () => {
       if (tickRef.current) window.clearTimeout(tickRef.current);
     };
   }, [state]);
 
-  if (!state) {
-    return <div style={{ padding: 30 }}>Preparing match…</div>;
-  }
-
   const curSet = state.sets[state.currentSet];
 
   const handleNextSet = () => {
-    setLive(s => (s ? startNextSet(s) : s));
+    setLive(s => startNextSet(s));
   };
 
   const handleFinish = () => {
@@ -470,7 +522,6 @@ function LiveMatchView({
       scoreLine: liveScoreLine(state),
     };
     onFinish(resolved);
-    setLive(null);
   };
 
   const roundLabel = currentRound?.name || '';
@@ -560,11 +611,11 @@ function LiveMatchView({
 
       {/* For T250/T500, show the SF/F mini context */}
       {watchedPlan(tournament.tier).liveSemis === false && watchedPlan(tournament.tier).showFullBracket === false && (
-        <SFFMiniContext bracket={bracket} players={players} />
+        <SFFMiniContext bracket={bracket} players={players} rankMap={rankMap} onPlayerClick={onPlayerClick} />
       )}
       {/* For GS we show running bracket SF/F */}
       {watchedPlan(tournament.tier).liveSemis && (
-        <SFFMiniContext bracket={bracket} players={players} compact />
+        <SFFMiniContext bracket={bracket} players={players} rankMap={rankMap} onPlayerClick={onPlayerClick} compact />
       )}
     </div>
   );
@@ -581,10 +632,14 @@ function expandRoundName(n: string): string {
 function SFFMiniContext({
   bracket,
   players,
+  rankMap,
+  onPlayerClick,
   compact,
 }: {
   bracket: Round[];
   players: Player[];
+  rankMap: Map<number, number>;
+  onPlayerClick: (p: Player) => void;
   compact?: boolean;
 }) {
   // Show last 2 rounds (SF, F) if present
@@ -595,7 +650,7 @@ function SFFMiniContext({
         <div className="minib-round" key={ri}>
           <h4>{expandRoundName(r.name)}</h4>
           {r.matches.map((m, mi) => (
-            <BracketMatch key={mi} match={m} players={players} />
+            <BracketMatch key={mi} match={m} players={players} rankMap={rankMap} onPlayerClick={onPlayerClick} />
           ))}
         </div>
       ))}
@@ -610,11 +665,15 @@ function TournamentSummary({
   tournament,
   bracket,
   players,
+  rankMap,
+  onPlayerClick,
   onCommit,
 }: {
   tournament: Tournament;
   bracket: Round[];
   players: Player[];
+  rankMap: Map<number, number>;
+  onPlayerClick: (p: Player) => void;
   onCommit: () => void;
 }) {
   const final = bracket[bracket.length - 1].matches[0];
@@ -670,7 +729,7 @@ function TournamentSummary({
         Confirm result →
       </button>
       <hr className="rule" />
-      <BracketDisplay bracket={bracket} players={players} />
+      <BracketDisplay bracket={bracket} players={players} rankMap={rankMap} onPlayerClick={onPlayerClick} />
     </div>
   );
 }

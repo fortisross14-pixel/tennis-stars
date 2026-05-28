@@ -1,14 +1,16 @@
 import React from 'react';
-import { GameState } from '../sim/types';
+import { GameState, Player } from '../sim/types';
 import { rankPlayers, getRolling52Points } from '../sim/ranking';
 import { PlayerCell, RarityPill, SurfaceTag } from './common';
 
 export function RankingView({
   state,
   setState,
+  onPlayerClick,
 }: {
   state: GameState;
   setState: (s: GameState) => void;
+  onPlayerClick: (p: Player) => void;
 }) {
   const ranked = rankPlayers(state.players, state.rankingView, state.absoluteWeek);
   return (
@@ -52,7 +54,7 @@ export function RankingView({
               <tr key={p.id}>
                 <td className="rank-num">{i + 1}</td>
                 <td>
-                  <PlayerCell player={p} />
+                  <PlayerCell player={p} onClick={onPlayerClick} />
                 </td>
                 <td>
                   <RarityPill rarity={p.rarity} />
