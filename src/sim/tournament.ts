@@ -93,12 +93,27 @@ export function simulateTournamentAutoRounds(
   const ordered = seedBracket(entries);
   const plan = watchedPlan(t.tier);
 
+  // Assign per-player tournament multipliers (form for this event).
+  // Distribution: 80% baseline, 8% +5%, 6% +10%, 4% -5%, 2% -10%.
+  // Mutates `t.multipliers` so it's available throughout this tournament's life.
+  if (!t.multipliers) {
+    t.multipliers = {};
+    for (const e of ordered) {
+      const r = Math.random();
+      let mult: number;
+      if (r < 0.80) mult = 1.0;
+      else if (r < 0.88) mult = 1.05;
+      else if (r < 0.94) mult = 1.10;
+      else if (r < 0.98) mult = 0.95;
+      else mult = 0.90;
+      t.multipliers[e.id] = mult;
+    }
+  }
+
   // For 96-draw GS: actually we'll just use a 64-draw bracket-of-record (entries already 96 -> we trim/treat the
   // "preliminary" qualifying as already-completed). The shown bracket starts at R64.
   let bracketEntries = ordered;
   if (t.drawSize === 96) {
-    // Top 32 get byes to R32; we'll keep visible bracket as 64 entries -> R64 round
-    // Take top 32 entries and 32 lowest-ranked-of-the-96 (treat them as having survived a prelim)
     bracketEntries = ordered.slice(0, 64);
   }
 
@@ -137,7 +152,9 @@ export function simulateTournamentAutoRounds(
       for (let i = 0; i < currentPlayers.length; i += 2) {
         const p1 = currentPlayers[i];
         const p2 = currentPlayers[i + 1];
-        const m = simulateMatch(p1, p2, t.surface, bestOfFor(t.tier));
+        const mult1 = t.multipliers?.[p1.id] ?? 1;
+        const mult2 = t.multipliers?.[p2.id] ?? 1;
+        const m = simulateMatch(p1, p2, t.surface, bestOfFor(t.tier), roundName, mult1, mult2);
         matches.push(m);
       }
       rounds.push({ name: roundName, matches });
@@ -189,7 +206,11 @@ export function appendRoundAndSimulateRest(
     } else {
       // auto
       for (let i = 0; i < winners.length; i += 2) {
-        const m = simulateMatch(winners[i], winners[i + 1], t.surface, bestOfFor(t.tier));
+        const p1 = winners[i];
+        const p2 = winners[i + 1];
+        const mult1 = t.multipliers?.[p1.id] ?? 1;
+        const mult2 = t.multipliers?.[p2.id] ?? 1;
+        const m = simulateMatch(p1, p2, t.surface, bestOfFor(t.tier), nextName, mult1, mult2);
         matches.push(m);
       }
       updated.push({ name: nextName, matches });
@@ -253,8 +274,9 @@ export function applyTournamentEffects(
     p.yearPoints += awarded;
     p.careerPoints += awarded;
 
-    // stamina drain — larger for longer-running tournaments and GS
-    const drain = t.tier === 'GS' ? 35 : t.tier === 'M1000' ? 22 : t.tier === 'T500' ? 16 : t.tier === 'T250' ? 12 : 20;
+    // stamina drain — larger for longer-running tournaments and GS. physical_beast halves it.
+    let drain = t.tier === 'GS' ? 35 : t.tier === 'M1000' ? 22 : t.tier === 'T500' ? 16 : t.tier === 'T250' ? 12 : 20;
+    if (p.trait === 'physical_beast') drain = Math.round(drain * 0.5);
     p.stamina = Math.max(0, p.stamina - drain);
 
     // Morale: based on result + rarity
@@ -318,8 +340,9 @@ function computeMoraleDelta(rarity: Rarity, lostAt: string, tier: TournamentTier
 // Replenish stamina during a rest week (called when week passes with no tournament for that player)
 export function restWeekRecover(p: Player): void {
   if (p.retired) return;
-  // recover ~15 per rest week, but slower past 70
   const room = p.baseStaminaMax - p.stamina;
-  const recovery = Math.min(room, p.stamina < 30 ? 8 : 15);
+  let baseRecovery = p.stamina < 30 ? 8 : 15;
+  if (p.trait === 'quick_recovery') baseRecovery *= 2;
+  const recovery = Math.min(room, baseRecovery);
   p.stamina = Math.min(p.baseStaminaMax, p.stamina + recovery);
 }

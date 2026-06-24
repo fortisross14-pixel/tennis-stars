@@ -1,5 +1,7 @@
 import { Player, Rarity, Surface, PlayerSkills } from './types';
 import { COUNTRIES } from '../data/countries';
+import { generateNameFor } from '../data/namePools';
+import { rollTrait, TraitId } from './traits';
 
 // Rarity targets across the 120-player roster
 export const RARITY_TARGETS: Record<Rarity, number> = {
@@ -32,7 +34,24 @@ function pick<T>(arr: T[]): T {
 }
 
 // Apply year multiplier (rookie 80%, year 2 90%, last year 90%, otherwise 100%)
-export function yearMultiplier(yearInCareer: number, careerLength: number): number {
+// Trait-aware:
+//   - young_star: year 1 = 95%, year 2 = 98%, last year still 90%
+//   - late_bloomer: year 1 = 70%, year 2 = 80%, year 3 = 92%, then 100%, last year 90%; peak shifts later
+export function yearMultiplier(yearInCareer: number, careerLength: number, trait?: TraitId): number {
+  if (trait === 'young_star') {
+    if (yearInCareer === 1) return 0.95;
+    if (yearInCareer === 2) return 0.98;
+    if (yearInCareer === careerLength) return 0.90;
+    return 1.0;
+  }
+  if (trait === 'late_bloomer') {
+    if (yearInCareer === 1) return 0.70;
+    if (yearInCareer === 2) return 0.80;
+    if (yearInCareer === 3) return 0.92;
+    if (yearInCareer === careerLength) return 0.92; // sustains a bit longer
+    return 1.0;
+  }
+  // Default curve
   if (yearInCareer === 1) return 0.80;
   if (yearInCareer === 2) return 0.90;
   if (yearInCareer === careerLength) return 0.90;
@@ -49,9 +68,10 @@ function generateYearlySkill(baseSkill: number): number {
 }
 
 // Derive per-skill ratings from yearly skill + surface specialization.
-// Specialization gives a small boost to certain skills, mild penalty to others.
-// Hard surface specialists -> stronger serve/volleys; clay -> stronger forehand/physical; grass -> stronger serve/volleys with backhand variance
-function deriveSkillsForYear(yearlySkill: number, spec: Surface, physBase: number): PlayerSkills {
+// Trait modifiers applied here:
+//   - enhanced_quality: +3 to every skill
+//   - final_focus: -2 to every skill at baseline (the +3 in SF/F applies in match.ts)
+function deriveSkillsForYear(yearlySkill: number, spec: Surface, physBase: number, trait?: TraitId): PlayerSkills {
   // Each skill is yearlySkill +/- small noise, with specialty modifiers
   const noise = () => (Math.random() - 0.5) * 4; // small per-skill randomness
   let fh = yearlySkill + noise();
@@ -66,6 +86,12 @@ function deriveSkillsForYear(yearlySkill: number, spec: Surface, physBase: numbe
   } else {
     sv += 5; vl += 4; bh -= 2;
   }
+  // Trait skill modifiers (applied uniformly)
+  let traitAdj = 0;
+  if (trait === 'enhanced_quality') traitAdj = 3;
+  else if (trait === 'final_focus') traitAdj = -2;
+  fh += traitAdj; bh += traitAdj; sv += traitAdj; vl += traitAdj;
+  let ph = physBase + noise() + traitAdj;
   // clamp
   const clamp = (v: number) => Math.max(40, Math.min(100, Math.round(v)));
   return {
@@ -73,7 +99,7 @@ function deriveSkillsForYear(yearlySkill: number, spec: Surface, physBase: numbe
     backhand: clamp(bh),
     serve: clamp(sv),
     volleys: clamp(vl),
-    physical: clamp(physBase + noise()),
+    physical: clamp(ph),
   };
 }
 
@@ -84,17 +110,17 @@ export function generatePlayer(
   careerLength: number,
 ): Player {
   const country = pick(COUNTRIES);
-  const firstName = pick(country.firstNames);
-  const surname = pick(country.surnames);
+  const { firstName, surname } = generateNameFor(country.code);
+  const trait = rollTrait();
   const [bMin, bMax] = RARITY_BASE_RANGE[rarity];
   const baseSkill = randInt(bMin, bMax);
   const yearly = generateYearlySkill(baseSkill);
-  // Apply career multiplier to yearly skill effective rating
-  const mult = yearMultiplier(yearInCareer, careerLength);
+  // Apply career multiplier (trait-aware) to yearly skill effective rating
+  const mult = yearMultiplier(yearInCareer, careerLength, trait);
   const effectiveYearly = Math.round(yearly * mult);
   const spec = pick(SURFACES);
   const physBase = effectiveYearly; // physical based on year too
-  const skills = deriveSkillsForYear(effectiveYearly, spec, physBase);
+  const skills = deriveSkillsForYear(effectiveYearly, spec, physBase, trait);
   const baseStaminaMax = randInt(80, 100);
   return {
     id,
@@ -104,6 +130,7 @@ export function generatePlayer(
     iso2: country.iso2,
     flag: country.flag,
     rarity,
+    trait,
     surfaceSpec: spec,
     baseSkill,
     yearlySkill: effectiveYearly,
@@ -156,13 +183,14 @@ export function generateInitialRoster(): { players: Player[]; nextId: number } {
   return { players, nextId: id };
 }
 
-// Update a player's yearly skill at offseason (within +/-5 of base, AND constrained drift)
-export function rollNewYearlySkill(baseSkill: number, prevYearly: number): number {
+// Update a player's yearly skill at offseason (within +/-5 of base, AND constrained drift).
+// stable_over_years trait: never drops below base.
+export function rollNewYearlySkill(baseSkill: number, prevYearly: number, trait?: TraitId): number {
   // small drift from previous; allow up to ~3 step change
   const drift = Math.round((Math.random() - 0.5) * 6);
   let candidate = prevYearly + drift;
   // clamp to base+/-5
-  const lo = baseSkill - 5;
+  const lo = trait === 'stable_over_years' ? baseSkill : baseSkill - 5;
   const hi = baseSkill + 5;
   if (candidate < lo) candidate = lo;
   if (candidate > hi) candidate = hi;
@@ -171,13 +199,13 @@ export function rollNewYearlySkill(baseSkill: number, prevYearly: number): numbe
 
 // Refresh skills for a new year given new yearly skill and year-in-career
 export function refreshPlayerSkillsForYear(player: Player): void {
-  // determine new uncapped yearly
-  const newYearly = rollNewYearlySkill(player.baseSkill, player.yearlySkill);
+  // determine new uncapped yearly (trait-aware floor)
+  const newYearly = rollNewYearlySkill(player.baseSkill, player.yearlySkill, player.trait);
   player.prevYearSkill = player.yearlySkill;
-  // apply career multiplier
-  const mult = yearMultiplier(player.yearInCareer, player.careerLength);
+  // apply career multiplier (trait-aware curve)
+  const mult = yearMultiplier(player.yearInCareer, player.careerLength, player.trait);
   player.yearlySkill = Math.round(newYearly * mult);
-  player.skills = deriveSkillsForYear(player.yearlySkill, player.surfaceSpec, player.yearlySkill);
+  player.skills = deriveSkillsForYear(player.yearlySkill, player.surfaceSpec, player.yearlySkill, player.trait);
   player.morale = 65;
   player.stamina = player.baseStaminaMax;
   player.yearPoints = 0;

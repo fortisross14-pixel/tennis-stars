@@ -19,6 +19,7 @@ export interface Player {
   iso2: string;     // ISO alpha-2 lowercase for flag display
   flag: string;
   rarity: Rarity;
+  trait: import('./traits').TraitId;  // personality trait, fixed at birth
   surfaceSpec: Surface; // primary specialization
   baseSkill: number; // anchored by rarity (e.g., 93 for a legend)
   yearlySkill: number; // current year's rating within +/-5 of base
@@ -78,6 +79,9 @@ export interface Tournament {
   runnerUpId?: number;
   finalScore?: string; // like "3-1" in sets
   bracket?: Round[]; // filled after sim
+  // Per-tournament form multipliers — each entrant gets one when the draw is set.
+  // Stored as { [playerId]: multiplier } so it's JSON-serializable for save slots.
+  multipliers?: Record<number, number>;
 }
 
 export interface MatchPlayer {

@@ -124,5 +124,11 @@ export function decideEntries(
     }
   }
 
+  // Sort the final field by current ranking — Seed #1 = highest-ranked entrant, Seed #2 = next, etc.
+  // We use the original `ranked` array's order: lower index = better rank.
+  const rankIndex = new Map<number, number>();
+  ranked.forEach((p, i) => rankIndex.set(p.id, i));
+  out.sort((a, b) => (rankIndex.get(a.id) ?? 999) - (rankIndex.get(b.id) ?? 999));
+
   return out.slice(0, tournament.drawSize);
 }

@@ -3,6 +3,7 @@ import { Player, GameState } from '../sim/types';
 import { Modal } from './Modal';
 import { Flag, Avatar, RarityPill, SurfaceTag, SkillBar } from './common';
 import { rankPlayers, getRolling52Points } from '../sim/ranking';
+import { TRAITS } from '../sim/traits';
 
 export function PlayerModal({
   player,
@@ -45,6 +46,11 @@ export function PlayerModal({
             <Flag iso2={player.iso2} size="lg" />
             <h2 className="pm-name">{player.firstName} {player.surname}</h2>
           </div>
+          <div className="pm-trait" title={TRAITS[player.trait].description}>
+            <span className="pm-trait-icon">✦</span>
+            <span className="pm-trait-label">{TRAITS[player.trait].label}</span>
+            <span className="pm-trait-short">· {TRAITS[player.trait].short}</span>
+          </div>
           <div className="pm-tags">
             <RarityPill rarity={player.rarity} />
             <SurfaceTag surface={player.surfaceSpec} />
@@ -74,6 +80,12 @@ export function PlayerModal({
         <StatCard label="Win %" value={winPct} />
         <StatCard label="Best ranking" value={player.bestRanking === 999 ? '—' : `#${player.bestRanking}`} />
         <StatCard label="Weeks at #1" value={player.weeksAtNo1} />
+      </div>
+
+      {/* Trait detail */}
+      <div className="pm-trait-detail">
+        <div className="pm-trait-detail-label">{TRAITS[player.trait].label}</div>
+        <div className="pm-trait-detail-text">{TRAITS[player.trait].description}</div>
       </div>
 
       {/* Skills */}

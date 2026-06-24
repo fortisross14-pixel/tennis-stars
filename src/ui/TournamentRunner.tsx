@@ -138,11 +138,14 @@ export function TournamentRunner({
             const p1 = state.players.find(p => p.id === m.p1)!;
             const p2 = state.players.find(p => p.id === m.p2)!;
             setBracket(updated);
+            const rName = updated[stage.roundIdx]?.name;
+            const m1 = tournament.multipliers?.[p1.id] ?? 1;
+            const m2 = tournament.multipliers?.[p2.id] ?? 1;
             setStage({
               kind: 'live',
               roundIdx: stage.roundIdx,
               matchIdx: next,
-              live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier)),
+              live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier), rName, m1, m2),
             });
           } else {
             // Round done — propagate, auto-sim intervening, then start next manual round if any
@@ -167,11 +170,13 @@ export function TournamentRunner({
               const m = r.matches[firstUnfinished];
               const p1 = state.players.find(p => p.id === m.p1)!;
               const p2 = state.players.find(p => p.id === m.p2)!;
+              const m1 = tournament.multipliers?.[p1.id] ?? 1;
+              const m2 = tournament.multipliers?.[p2.id] ?? 1;
               setStage({
                 kind: 'live',
                 roundIdx: nextRoundIdx,
                 matchIdx: firstUnfinished,
-                live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier)),
+                live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier), r.name, m1, m2),
               });
             }
           }
@@ -239,11 +244,13 @@ function startLiveAtFirstUnplayed(
   const m = r.matches[idx];
   const p1 = players.find(p => p.id === m.p1)!;
   const p2 = players.find(p => p.id === m.p2)!;
+  const m1 = tournament.multipliers?.[p1.id] ?? 1;
+  const m2 = tournament.multipliers?.[p2.id] ?? 1;
   setStage({
     kind: 'live',
     roundIdx: lastIdx,
     matchIdx: idx,
-    live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier)),
+    live: createLiveMatch(p1, p2, tournament.surface, bestOfFor(tournament.tier), r.name, m1, m2),
   });
 }
 

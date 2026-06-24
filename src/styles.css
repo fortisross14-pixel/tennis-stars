@@ -1371,3 +1371,54 @@ select:hover { border-color: var(--cyan); }
   font-variant-numeric: tabular-nums;
   margin-left: 4px;
 }
+
+/* ============================================
+   PLAYER MODAL — TRAIT DISPLAY
+   ============================================ */
+.pm-trait {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cyan-deep);
+  background: var(--cyan-soft);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(0, 153, 216, 0.18);
+}
+.pm-trait-icon {
+  font-size: 13px;
+  color: var(--cyan);
+}
+.pm-trait-label {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.pm-trait-short {
+  font-weight: 500;
+  color: var(--ink-mid);
+  font-size: 12px;
+}
+.pm-trait-detail {
+  background: linear-gradient(180deg, var(--cyan-soft), white);
+  border: 1px solid rgba(0, 153, 216, 0.2);
+  border-left: 3px solid var(--cyan);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+}
+.pm-trait-detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cyan-deep);
+  margin-bottom: 4px;
+}
+.pm-trait-detail-text {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+}
