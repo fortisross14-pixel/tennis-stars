@@ -27,6 +27,8 @@ import { ensureUniverseData } from './migrations.js';
 import { pruneRivalryCandidates, rivalryForPair, updateRivalryStatuses } from './rivalries.js';
 import { isBigTournamentEvent, landmarkLabel, coverageModeForEvent } from '../data/showcase.js';
 
+// Headless balance runs can simulate only the career tour (universe.activeTours).
+function activeTours(universe){return universe.activeTours||['ATP','WTA'];}
 function absoluteWeek(year,week) { return year * 52 + week; }
 function recordRankingSnapshot(universe,phase='end') {
   universe.rankingHistory??=[];
@@ -61,7 +63,7 @@ function planTargets(universe,tour,rng){
 }
 
 function ensureAnnualPlans(universe,rng){
-  for(const tour of ['ATP','WTA'])if(universe.players[tour].some(p=>!p.targetEvents?.length||p.season?.year!==universe.year))planTargets(universe,tour,rng);
+  for(const tour of activeTours(universe))if(universe.players[tour].some(p=>!p.targetEvents?.length||p.season?.year!==universe.year))planTargets(universe,tour,rng);
 }
 
 function juniorGuestsForEvent(universe,tour,event){
@@ -211,7 +213,7 @@ export function simulateWeek(universe,{live=false}={}) {
   }
   const juniorEvents=universe.juniorCalendar.filter(e=>e.week===universe.week && e.status!=='completed');
   const contexts={};const liveStates=[];
-  for (const tour of ['ATP','WTA']) {
+  for (const tour of activeTours(universe)) {
     const ctx=weekContext(universe,tour);contexts[tour]=ctx;
     for (const p of universe.players[tour]) pruneRankingPoints(p,universe.year,universe.week);
     for (const event of currentEvents.filter(e=>e.tour===tour)) {
@@ -247,7 +249,7 @@ export function simulateWeek(universe,{live=false}={}) {
   }
   universe.rngSeed=rng.seed;
   if(liveStates.length){
-    universe.liveEvent={year:universe.year,week:universe.week,label:landmarkLabel(liveStates.map(st=>universe.calendar.find(e=>e.id===st.eventId))),states:liveStates,contexts:{ATP:ctxToJSON(contexts.ATP),WTA:ctxToJSON(contexts.WTA)},startedAt:new Date().toISOString()};
+    universe.liveEvent={year:universe.year,week:universe.week,label:landmarkLabel(liveStates.map(st=>universe.calendar.find(e=>e.id===st.eventId))),states:liveStates,contexts:Object.fromEntries(Object.entries(contexts).map(([t,c])=>[t,ctxToJSON(c)])),startedAt:new Date().toISOString()};
     return universe;
   }
   closeWeek(universe,contexts,rng);
@@ -255,7 +257,7 @@ export function simulateWeek(universe,{live=false}={}) {
 }
 
 function closeWeek(universe,contexts,rng){
-  for(const tour of ['ATP','WTA']){
+  for(const tour of activeTours(universe)){
     const ctx=contexts[tour];
     updateWeekCondition(universe,tour,ctx.playedIds,rng);
     refreshRankings(universe.players[tour]);
@@ -292,7 +294,7 @@ export function livePendingSlots(state){return state?.done?[]:(state?.slots||[])
 
 function playLiveSlot(universe,state,slot,rng){
   const event=universe.calendar.find(e=>e.id===state.eventId);
-  const ctx=ctxFromJSON(universe.liveEvent.contexts[state.tour]);
+  const ctx=ctxFromJSON(universe.liveEvent.contexts[state.tour]||ctxToJSON(weekContext(universe,state.tour)));
   let result;
   if(state.kind==='team')result=playTeamTie(universe,state,slot,event,rng,ctx.playedIds);
   else result=playSinglesSlot(state,slot,event,rng,universe,liveById(universe,state));
@@ -310,7 +312,7 @@ function finishLiveIfComplete(universe,rng){
   if(!live||!live.states.every(st=>st.done))return false;
   // Result summary for the champions screen, kept after the week closes.
   universe.lastLandmark={year:live.year,week:live.week,label:live.label,eventIds:live.states.map(st=>st.eventId)};
-  const contexts={ATP:ctxFromJSON(live.contexts.ATP),WTA:ctxFromJSON(live.contexts.WTA)};
+  const contexts=Object.fromEntries(Object.entries(live.contexts).map(([t,c])=>[t,ctxFromJSON(c)]));
   universe.liveEvent=null;
   closeWeek(universe,contexts,rng);
   return true;
@@ -426,7 +428,7 @@ function archiveSeasonDetails(universe,year) {
 
 function buildYearEndTransition(universe) {
   const arcs={ATP:seasonArcNarratives(universe,'ATP'),WTA:seasonArcNarratives(universe,'WTA')};
-  const awards=[awardForTour(universe,'ATP',arcs.ATP),awardForTour(universe,'WTA',arcs.WTA)];
+  const awards=activeTours(universe).map(t=>awardForTour(universe,t,arcs[t]));
   universe.awards.push(...awards);
   const majorWinners=universe.tournamentEditions.filter(e=>e.event.year===universe.year&&e.event.level==='Grand Slam').map(e=>({tour:e.event.tour,event:e.event.name,winner:e.championName,country:e.championCountry}));
   const summary={
@@ -705,8 +707,9 @@ export function openNextSeason(universe,{fromOneYear=false}={}) {
   const previousSummary=universe.transition?.yearSummary || universe.yearSummaries[universe.yearSummaries.length-1];
   const rng=new RNG(universe.rngSeed);
   const newYear=universe.year+1;
-  const atp=processTourTransition(universe,'ATP',rng,newYear);
-  const wta=processTourTransition(universe,'WTA',rng,newYear);
+  const empty={retired:[],promoted:[],doublesConversions:[],overflowRetired:[],newJuniors:[],breakthroughs:[]};
+  const atp=activeTours(universe).includes('ATP')?processTourTransition(universe,'ATP',rng,newYear):empty;
+  const wta=activeTours(universe).includes('WTA')?processTourTransition(universe,'WTA',rng,newYear):empty;
   const hallOfFameClass=inductHallOfFame(universe,newYear);
   universe.year=newYear;
   universe.week=1;
@@ -741,7 +744,7 @@ export function openNextSeason(universe,{fromOneYear=false}={}) {
   updateRivalryStatuses(universe);
   rivalryNarratives(universe);
   for(const {player,info} of [...(atp.breakthroughs||[]),...(wta.breakthroughs||[])])breakthroughNarrative(universe,player,info);
-  for(const tour of ['ATP','WTA'])for(const p of universe.players[tour].slice(0,60)){if(p.seasonForm>=4.2&&p.ranking>8)story(universe,'Preseason',`Insiders: ${fullName(p)} has never looked sharper`,`Pre-season reports from the practice courts suggest a big year could be coming for the world No. ${p.ranking}.`,1,1,{tour,playerIds:[p.id]});}
+  for(const tour of activeTours(universe))for(const p of universe.players[tour].slice(0,60)){if(p.seasonForm>=4.2&&p.ranking>8)story(universe,'Preseason',`Insiders: ${fullName(p)} has never looked sharper`,`Pre-season reports from the practice courts suggest a big year could be coming for the world No. ${p.ranking}.`,1,1,{tour,playerIds:[p.id]});}
   if(universe.transition.retired.length)story(universe,'Retirements',`${universe.transition.retired.length} careers close at the turn of the year`,universe.transition.retired.slice(0,4).map(r=>`${r.name} (${r.tour})`).join(', ')+(universe.transition.retired.length>4?' and others leave the circuit.':' leave the circuit.'),2,1);
   if(universe.transition.promoted.length)story(universe,'Juniors',`${universe.transition.promoted.length} juniors earn singles places`,universe.transition.promoted.slice(0,4).map(r=>r.name).join(', ')+' lead the graduation class.',4,1);
   if(universe.transition.doublesConversions.length)story(universe,'Doubles',`${universe.transition.doublesConversions.length} players choose doubles`,universe.transition.doublesConversions.slice(0,4).map(r=>r.name).join(', ')+' begin or continue a full-time doubles pathway as singles places remain limited.',3,1);

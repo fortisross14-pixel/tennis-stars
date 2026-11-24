@@ -28,7 +28,7 @@ function levelPriority(level){return {'Grand Slam':100,Olympics:98,'1000':86,Fin
 function effectiveRank(player){return player.protectedRanking&&player.protectedRankingUntil?Math.min(player.ranking||999,player.protectedRanking):player.ranking||999;}
 
 function eligible(player,event,unavailable){
-  if(player.controlled)return player.status==='active'&&player.entryEventId===event.id&&!unavailable.has(player.id)&&!(player.injury?.weeksRemaining>0);
+  if(player.controlled)return player.status==='active'&&player.entryEventId===event.id&&(player.season?.tournaments||0)<28&&!unavailable.has(player.id)&&!(player.injury?.weeksRemaining>0);
   if(player.status!=='active'||unavailable.has(player.id)||player.health<=55||player.injury?.weeksRemaining>0)return false;
   if(player.fatigue> (event.level==='Grand Slam'?90:event.level==='1000'?82:76))return false;
   const eventCount=player.season?.tournaments||0;
@@ -55,13 +55,17 @@ function entryScore(player,event,rng){
   return rankScore+surface*1.7+shape+developmental+target+surfaceBlock+majorCommitment+juniorBonus+topSkip-fatiguePenalty+rng.normal(0,8);
 }
 
+// ITF qualifying is open entry: a 32-player draw (three rounds) for four places.
+function qualifyingMultiplier(event){return event.level==='ITF'?8:4;}
 function qualifierSlots(event){if(['Finals','Olympics'].includes(event.level))return 0;if(event.drawSize>=128)return 16;if(event.drawSize>=64)return 8;if(event.drawSize>=32)return 4;return 0;}
 function wildcardSlots(event){if(event.level==='Finals')return 0;if(event.drawSize>=128)return 8;if(event.drawSize>=64)return 4;if(event.drawSize>=32)return 2;return 1;}
 
 function playQualifying(candidates,event,slots,rng){
   if(!slots)return {qualifiers:[],matches:[]};
-  const needed=Math.min(candidates.length,slots*4);let alive=candidates.slice(0,needed);const matches=[];
-  const roundNames=alive.length>=slots*4?['Q1','Q2']:['Q'];
+  const mult=qualifyingMultiplier(event);
+  const needed=Math.min(candidates.length,slots*mult);let alive=candidates.slice(0,needed);const matches=[];
+  const depth=Math.max(1,Math.floor(Math.log2(Math.max(2,alive.length/slots))));
+  const roundNames=depth===1?['Q']:Array.from({length:depth},(_,i)=>`Q${i+1}`);
   for(const round of roundNames){
     const next=[];
     for(let i=0;i+1<alive.length;i+=2){
@@ -95,7 +99,9 @@ export function selectEntries(players,event,unavailable,rng){
     return (b.score+localB+youthB+statusB+careerB)-(a.score+localA+youthA+statusA+careerA);
   });
   const wildcards=wildcardPool.slice(0,wcSlots).map(r=>r.p);wildcards.forEach(p=>used.add(p.id));
-  let qualifyingPool=candidates.filter(r=>!used.has(r.p.id)).slice(0,qSlots*4).map(r=>r.p);
+  let qualifyingPool=candidates.filter(r=>!used.has(r.p.id)).slice(0,qSlots*qualifyingMultiplier(event)).map(r=>r.p);
+  // ITF qualifying is open entry for the career player: they replace the last name on the sheet.
+  if(event.level==='ITF'&&qSlots>0){const me=candidates.find(r=>r.p.controlled&&!used.has(r.p.id)&&!qualifyingPool.includes(r.p));if(me){if(qualifyingPool.length>=qSlots*qualifyingMultiplier(event))qualifyingPool[qualifyingPool.length-1]=me.p;else qualifyingPool.push(me.p);}}
   // Qualifying is seeded by ranking so the best qualifiers are spread out.
   if(qualifyingPool.length>=4){const ord=[...qualifyingPool].sort((a,b)=>effectiveRank(a)-effectiveRank(b));const half=Math.ceil(ord.length/2);const top=ord.slice(0,half),bottom=rng.shuffle(ord.slice(half));qualifyingPool=top.flatMap((p,i)=>bottom[i]?[p,bottom[i]]:[p]);}
   const qualifying=playQualifying(qualifyingPool,event,qSlots,rng);qualifying.qualifiers.forEach(p=>used.add(p.id));
@@ -194,11 +200,47 @@ export function simulateSinglesEvent(players,event,unavailable,rng,universe=null
 function juniorStrength(player,event){return player.currentRating+((player.surfaceAffinity[event.surface]||70)-70)*.12+(player.shape-50)*.05-player.fatigue*.06;}
 function juniorPointsFor(level,round){const max={'Junior Slam':1000,'Junior Finals':750,'Junior 500':500,Continental:400}[level]||300;const fraction={W:1,F:.62,SF:.36,QF:.2,R16:.1,R32:.04}[round]||0;return Math.round(max*fraction);}
 function juniorSeededOrder(entries,rng){const sorted=[...entries].sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999));const seeds=sorted.slice(0,Math.min(8,Math.floor(entries.length/4))),rest=rng.shuffle(sorted.slice(seeds.length)),draw=new Array(entries.length);seeds.forEach((p,i)=>{let pos=Math.floor((i+.5)*entries.length/seeds.length);while(draw[pos])pos=(pos+1)%draw.length;draw[pos]=p;});let c=0;for(let i=0;i<draw.length;i+=1)if(!draw[i])draw[i]=rest[c++];return draw;}
+// The career player's junior record is kept apart from their professional one.
+function juniorStat(p,won){if(p.controlled){p.juniorRecord??={wins:0,losses:0,titles:0};if(won)p.juniorRecord.wins+=1;else p.juniorRecord.losses+=1;return;}if(won){p.season.matches+=1;p.season.wins+=1;p.career.matches+=1;p.career.wins+=1;}else{p.season.matches+=1;p.season.losses+=1;p.career.matches+=1;p.career.losses+=1;}}
 export function simulateJuniorEvent(juniors,event,rng,forced=[]){
   const forcedIds=new Set(forced.map(p=>p.id));
   const others=[...juniors].filter(p=>!forcedIds.has(p.id)&&!p.controlled).sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)||(juniorStrength(b,event)+rng.normal(0,1.5))-(juniorStrength(a,event)+rng.normal(0,1.5)));
   const entries=[...forced,...others].slice(0,event.drawSize);let alive=juniorSeededOrder(entries,rng);const matches=[],roundNames=ROUND_NAMES[event.drawSize]||ROUND_NAMES[32],exitRound=new Map();
-  for(const round of roundNames){const next=[];for(let i=0;i<alive.length;i+=2){const a=alive[i],b=alive[i+1];let real=null;if(a.controlled||b.controlled)real=simulateMatch(a,b,{...event,level:'ITF'},rng,round);const diff=juniorStrength(a,event)-juniorStrength(b,event),winner=real?(real.winnerId===a.id?a:b):rng.next()<1/(1+Math.exp(-diff/7))?a:b,loser=winner.id===a.id?b:a;winner.season.matches+=1;winner.season.wins+=1;winner.career.matches+=1;winner.career.wins+=1;loser.season.matches+=1;loser.season.losses+=1;loser.career.matches+=1;loser.career.losses+=1;winner.shape=clamp(winner.shape+1.3,0,100);loser.shape=clamp(loser.shape+.3,0,100);winner.fatigue=clamp(winner.fatigue+3,0,100);loser.fatigue=clamp(loser.fatigue+2,0,100);matches.push({id:`${event.id}-${round}-${a.id}-${b.id}`,eventId:event.id,year:event.year,week:event.week,tour:event.tour,round,surface:event.surface,playerA:a.id,playerB:b.id,winnerId:winner.id,loserId:loser.id,score:real?real.score:rng.next()<.55?'6-3 6-4':'7-6 4-6 6-3',sets:real?real.sets:2,totalGames:real?real.totalGames:19,durationMinutes:real?real.durationMinutes:95,setDetails:real?.setDetails,tags:real?.tags});exitRound.set(loser.id,round);next.push(winner);}alive=next;}
-  const champion=alive[0],finalMatch=matches[matches.length-1],finalist=entries.find(p=>p.id===finalMatch?.loserId);for(const p of entries){const round=p.id===champion.id?'W':exitRound.get(p.id)||roundNames[0];p.juniorPoints=(p.juniorPoints||0)+juniorPointsFor(event.level,round);p.season.results.push({eventId:event.id,event:event.name,level:event.level,surface:event.surface,round,points:juniorPointsFor(event.level,round),week:event.week});p.season.tournaments+=1;}champion.season.titles+=1;champion.career.titles+=1;addFame(champion,event.level==='Junior Slam'?8:event.level==='Junior Finals'?6:3);return {id:event.id,event:{...event,status:'completed'},championId:champion.id,finalistId:finalist?.id,championName:fullName(champion),finalistName:finalist?fullName(finalist):'',championCountry:champion.country,finalistCountry:finalist?.country,matches,entryIds:entries.map(p=>p.id),seeds:entries.slice().sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)).slice(0,8).map((p,i)=>({id:p.id,rank:i+1,name:fullName(p)}))};
+  for(const round of roundNames){const next=[];for(let i=0;i<alive.length;i+=2){const a=alive[i],b=alive[i+1];let real=null;if(a.controlled||b.controlled)real=simulateMatch(a,b,{...event,level:'ITF'},rng,round);const diff=juniorStrength(a,event)-juniorStrength(b,event),winner=real?(real.winnerId===a.id?a:b):rng.next()<1/(1+Math.exp(-diff/7))?a:b,loser=winner.id===a.id?b:a;juniorStat(winner,true);juniorStat(loser,false);winner.shape=clamp(winner.shape+1.3,0,100);loser.shape=clamp(loser.shape+.3,0,100);winner.fatigue=clamp(winner.fatigue+3,0,100);loser.fatigue=clamp(loser.fatigue+2,0,100);matches.push({id:`${event.id}-${round}-${a.id}-${b.id}`,eventId:event.id,year:event.year,week:event.week,tour:event.tour,round,surface:event.surface,playerA:a.id,playerB:b.id,winnerId:winner.id,loserId:loser.id,score:real?real.score:rng.next()<.55?'6-3 6-4':'7-6 4-6 6-3',sets:real?real.sets:2,totalGames:real?real.totalGames:19,durationMinutes:real?real.durationMinutes:95,setDetails:real?.setDetails,tags:real?.tags});exitRound.set(loser.id,round);next.push(winner);}alive=next;}
+  const champion=alive[0],finalMatch=matches[matches.length-1],finalist=entries.find(p=>p.id===finalMatch?.loserId);for(const p of entries){const round=p.id===champion.id?'W':exitRound.get(p.id)||roundNames[0];p.juniorPoints=(p.juniorPoints||0)+juniorPointsFor(event.level,round);p.season.results.push({eventId:event.id,event:event.name,level:event.level,surface:event.surface,round,points:juniorPointsFor(event.level,round),week:event.week});p.season.tournaments+=1;}if(champion.controlled){champion.juniorRecord.titles=(champion.juniorRecord.titles||0)+1;(champion.juniorRecord.titleLog??=[]).push({year:event.year,event:event.name,level:event.level});}else{champion.season.titles+=1;champion.career.titles+=1;}addFame(champion,event.level==='Junior Slam'?8:event.level==='Junior Finals'?6:3);return {id:event.id,event:{...event,status:'completed'},championId:champion.id,finalistId:finalist?.id,championName:fullName(champion),finalistName:finalist?fullName(finalist):'',championCountry:champion.country,finalistCountry:finalist?.country,matches,entryIds:entries.map(p=>p.id),seeds:entries.slice().sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)).slice(0,8).map((p,i)=>({id:p.id,rank:i+1,name:fullName(p)}))};
 }
 export function eventImportance(event){return levelPriority(event.level);}
+
+// ---------------------------------------------------------------------------
+// Career mode: projected entry status for the controlled player in each of a
+// week's events. Mirrors selectEntries (same eligibility, same order of events,
+// same scores without the random term). It is a projection, not a promise.
+// ---------------------------------------------------------------------------
+export function projectCareerEntries(players,events,player){
+  const order=[...events].filter(e=>e.level!=='Team').sort((a,b)=>levelPriority(b.level)-levelPriority(a.level));
+  const unavailable=new Set();const out={};
+  const noRng={normal:()=>0};
+  for(const event of order){
+    const prev=player.entryEventId;player.entryEventId=event.id;
+    const candidates=players.filter(p=>p.id===player.id?eligible(p,event,new Set()):eligible(p,event,unavailable)).map(p=>({p,score:entryScore(p,event,noRng)})).sort((a,b)=>b.score-a.score);
+    player.entryEventId=prev;
+    const qSlots=qualifierSlots(event),wcSlots=wildcardSlots(event),directSlots=Math.max(0,event.drawSize-qSlots-wcSlots);
+    const idx=candidates.findIndex(r=>r.p.id===player.id);
+    const others=candidates.filter(r=>r.p.id!==player.id);
+    // Fill the event with the AI field so the next events see who is busy.
+    others.slice(0,event.drawSize+qSlots*(qualifyingMultiplier(event)-1)).forEach(r=>unavailable.add(r.p.id));
+    let status='out',cutoffRank=null;
+    const lastDirect=candidates[Math.min(candidates.length,directSlots)-1]?.p;
+    cutoffRank=lastDirect?effectiveRank(lastDirect):null;
+    if(idx<0)status='ineligible';
+    else if(idx<directSlots)status='direct';
+    else if(idx<directSlots+wcSlots+qSlots*qualifyingMultiplier(event)&&qSlots>0)status='qualifying';
+    else if(player.wildcardEventId===event.id)status='wildcard';
+    else if(event.level==='ITF'&&qSlots>0)status='qualifying';
+    else if(idx<directSlots+wcSlots+qSlots*qualifyingMultiplier(event)+6)status='alternate';
+    const lastQ=candidates[Math.min(candidates.length,directSlots+wcSlots+qSlots*qualifyingMultiplier(event))-1]?.p;
+    out[event.id]={status,position:idx+1,directSlots,qualifyingSlots:qSlots,wildcards:wcSlots,cutoffRank,qualifyingCutoffRank:lastQ?effectiveRank(lastQ):null};
+  }
+  return out;
+}
+export const PRO_POINTS_BY_LEVEL=POINTS_BY_LEVEL;

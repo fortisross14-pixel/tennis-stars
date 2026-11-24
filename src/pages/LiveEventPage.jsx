@@ -54,7 +54,7 @@ function PlayerLine({universe,state,id,winnerId,score,onPlayer,align='left'}){
 function TeamLine({country,winner}){return <span className={`lv-line ${winner?(winner===country?'won':'lost'):''}`}><Flag code={country}/><span className="lv-name">{country}</span></span>;}
 
 // --- Match player -------------------------------------------------------------
-function MatchPlayer({universe,eventId,slot,round,a,b,kind,onAction,onClose,onNext,onPlayer,busy}){
+export function MatchPlayer({universe,eventId,slot,round,a,b,kind,onAction,onClose,onNext,onPlayer,busy}){
   const event=universe.calendar.find(e=>e.id===eventId);
   const source=liveOrArchived(universe,eventId);
   const match=source?matchForPair({...source,kind},round,a,b,slot):null;
@@ -110,7 +110,7 @@ function TieModal({universe,event,tie,round,a,b,onCompute,onClose,onNext,onPlaye
 }
 
 // --- Draw views --------------------------------------------------------------------
-function RoundMatches({universe,state,r,featured,onWatch,onQuick,onPlayer,busy}){
+export function RoundMatches({universe,state,r,featured,onWatch,onQuick,onPlayer,busy}){
   const round=state.rounds[r];const pairs=pairsForRound(state,r);if(!pairs)return null;
   return <div className={`lv-round-grid ${pairs.length<=4?'big':''}`}>{pairs.map(([a,b],slot)=>{
     const m=matchForPair(state,round,a,b,slot);const winner=state.kind==='team'?m?.winner:m?.winnerId;
@@ -122,7 +122,7 @@ function RoundMatches({universe,state,r,featured,onWatch,onQuick,onPlayer,busy})
     </article>;})}</div>;
 }
 
-function Bracket({universe,state,onPlayer}){
+export function Bracket({universe,state,onPlayer}){
   const from=Math.max(0,state.rounds.findIndex(r=>r==='QF'));
   const cols=state.rounds.slice(from).map((round,k)=>({round,r:from+k}));
   const champ=state.kind==='team'?state.championCountry:state.championId;
