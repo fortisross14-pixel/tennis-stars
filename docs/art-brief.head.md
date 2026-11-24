@@ -31,8 +31,14 @@ Faces are assembled in code from layers in a 200 × 200 unit box (export art at 
 
 `background · hairBack · shirt · neck · ears · head · eyes · brows · nose · mouth · facialHair · hairFront · accessory`
 
-- Templates in `docs/art-templates/`: `face-template-atp.png`, `face-template-wta.png` (the bare base head
-  every part must fit), and `face-layer-guide.png` (grid with eye line, brow line, nose tip, mouth and collar).
+- Templates in `docs/art-templates/` (made by `node scripts/face-templates.cjs`) are **placement guides only, not
+  a style reference**: `face-template-atp.png` / `face-template-wta.png` are plain grey mannequin silhouettes
+  (head, ears, neck, shoulders) and `face-layer-guide.png` marks the skull top, hairline, brows, eye line, nose
+  tip, mouth and chin. Don't feed them to a generator as a style image.
+- **Style anchor first:** generate one complete face in the look you want, e.g. *front-facing head-and-shoulders
+  portrait of a young professional tennis player, stylized semi-realistic sports videogame art, soft studio rim
+  light, neutral grey background, centred, looking at camera*. Scale it so it matches the mannequin's outline,
+  then inpaint hair and facial hair away to get your base head. Build every part on that base.
 - **Tinted layers** (skin and hair) must be painted in **neutral grey**, with `#808080` as the base tone and
   shading lighter or darker around it. The game multiplies them by 10 skin tones and 10 hair colours, so one
   sheet covers everyone. Eyes, mouth, shirt and accessories are painted in full colour (shirt and accessory are
@@ -40,13 +46,13 @@ Faces are assembled in code from layers in a 200 × 200 unit box (export art at 
 - Each file is a full 1024 × 1024 transparent PNG with the part in its final position (no cropping), named
   `public/art/faces/<layer>/<variant>.png`, and listed in `public/art/faces/manifest.json`, e.g.
   `{ "head": ["0","1","2","3","4"], "hairFront": ["crop","ponytail"] }`.
-- **How to generate parts that line up:** use image-to-image or inpainting on the template. For hair: load
-  `face-template-*.png`, mask only the hair area, and prompt the hairstyle; then cut the hair out to its own
+- **How to generate parts that line up:** inpaint on your base head (from the style anchor), checking it against
+  the guide. For hair: mask only the hair area and prompt the hairstyle; then cut the hair out to its own
   transparent PNG. For eyes, nose and mouth, mask that region only. Keep the same seed and model for a whole
   layer so the set looks consistent.
 - **Generic face-part prompt:**
   > front-facing stylized athlete bust, *[part description]*, neutral grey material (#808080) with soft
-  > shading, centred on the provided template, same camera and lighting as the template, clean edges,
+  > shading, same camera, framing and lighting as the base head, clean edges,
   > transparent background, {{STYLE}}
 
 {{FACE_LAYERS}}
