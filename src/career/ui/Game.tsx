@@ -14,11 +14,15 @@ import { Improve } from './Improve';
 import { MyEvent } from './MyEvent';
 import { Schedule } from './Schedule';
 import { MatchViewer } from './MatchViewer';
+import { ArenaWeek } from './arena/ArenaWeek';
+import { ArenaMatch } from './arena/ArenaMatch';
+import * as SS from '../../sim/season.js';
+const { liveState } = SS as any;
 import { money, ordinalRank } from './common';
 
 export interface GameActions {
-  plan: (p: WeekPlan) => void; play: () => void; auto: (weeks: number) => void; decision: (id: string) => void;
-  live: (mode: string, slot?: number | null) => Promise<void>; finishEvent: () => void; toggleWatch: () => void;
+  plan: (p: WeekPlan) => void; play: () => Promise<void> | void; auto: (weeks: number) => void; decision: (id: string) => void;
+  live: (mode: string, slot?: number | null) => Promise<void>; finishEvent: () => Promise<void> | void; toggleWatch: () => void;
   openPack: (i: number) => Promise<string[]>; mergePacks: (t: PackTier) => void; playCard: (uid: string) => void; sellCard: (uid: string) => void;
   staff: (k: StaffKey, lvl: number) => void; partner: (id: string | null) => void; setPlan: (week: number, plan: WeekPlan | null) => void;
   buyPack: (t: PackTier) => void; buyEquipment: (id: string) => void;
@@ -74,12 +78,24 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
   const tour = c.tour;
   const [search, setSearch] = useState('');
   const [replay, setReplay] = useState<string | null>(null);
-  useEffect(() => { if (u.liveEvent && c.live && route.page === 'week') go('event'); }, [!!u.liveEvent]);
+  const [arenaKey, setArenaKey] = useState(0);
+  useEffect(() => { if (u.liveEvent && c.live && route.page === 'week') go('event'); if (u.liveEvent && c.live && route.page === 'preview' && route.parts[0] !== 'match') go('preview', 'match'); }, [!!u.liveEvent]);
   const onPlayer = (id: string) => go('player', id), onTournament = (key: string) => go('tournament', key), onMatch = (e: string, m: string) => go('match', e, m), onRivalry = (x: string, y: string) => go('rivalry', x, y);
   const canWatch = (id: string) => !!c.matchLog.find((m) => m.id === id)?.sets.length;
   const jr = juniorRank(u);
   const pg = route.page, sub = route.parts[0] ?? '';
   let page: React.ReactNode;
+  if (pg === 'preview') {
+    const exitPreview = () => go('week');
+    if (route.parts[0] === 'match') {
+      const cont = async () => {
+        if (u.liveEvent && c.live) { const st = liveState(u, c.live.eventId); if (st?.exitRound?.[p.id] || st?.done) await a.finishEvent(); else await a.live('to-my-match'); setArenaKey((k) => k + 1); }
+        else go('preview', 'week');
+      };
+      return <ArenaMatch key={arenaKey} u={u} busy={busy} onLive={a.live} onExit={exitPreview} onContinue={cont} recordId={route.parts[1]} />;
+    }
+    return <ArenaWeek u={u} busy={busy} onPlan={a.plan} onPlay={async () => { const before = c.matchLog.length; await a.play(); if (!u.liveEvent && careerOf(u).matchLog.length > before) go('preview', 'match'); }} onExit={exitPreview} />;
+  }
   if (pg === 'week') {
     const weekTabs = <nav className="cs-subnav"><button className={sub !== 'schedule' ? 'active' : ''} onClick={() => go('week')}>This week</button><button className={sub === 'schedule' ? 'active' : ''} onClick={() => go('week', 'schedule')}>Schedule ahead</button></nav>;
     page = c.retired ? <Legacy u={u} a={a} /> : u.seasonEnded ? <div className="cs-page"><SeasonReview u={u} busy={busy} a={a} />{c.lastReport && <ReportCard r={c.lastReport} onWatch={setReplay} canWatch={canWatch} />}</div>
@@ -126,6 +142,7 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
           {u.liveEvent && c.live && <button className="cs-pill live" onClick={() => go('event')}>● Live</button>}
         </div>
         <div className="season-chip"><span>{u.year}</span><strong>Week {u.week}</strong></div>
+        <button className="save-icon cs-try-new" onClick={() => go('preview', 'week')} title="Preview of the new look">✨ New look</button>
         <button className="save-icon" onClick={a.exit}>Menu</button>
       </div>
       <nav className="main-nav cs-main-nav">{NAV.map(([k, l]) => <button key={k} className={active === k ? 'active' : ''} onClick={() => go(k)}>{l}</button>)}</nav>

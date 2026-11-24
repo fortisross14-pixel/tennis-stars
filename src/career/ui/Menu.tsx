@@ -8,6 +8,8 @@ import { upgradeCost, type Meta } from '../meta';
 import type { SlotMeta } from '../storage';
 import type { CareerSetup } from '../engine';
 import { Modal } from './common';
+import { installState, onInstallChange, promptInstall } from '../install';
+import { useEffect } from 'react';
 
 const STYLE_DESC: Record<string, string> = {
   'Aggressive baseline': 'Big forehand, takes the ball early. At home on hard courts.',
@@ -34,6 +36,7 @@ export function Menu({ slots, meta, busy, storageOk, onNew, onLoad, onDelete, on
       <h1>Tennis Stars</h1>
       <p>Start as a 15-year-old junior with nothing but a racquet. Choose every week: train, rest or compete. Climb from ITF qualifying to Grand Slam finals in a living world of a thousand players.</p>
       {!storageOk && <p className="cs-alert">This browser blocks storage: careers will not be saved when you close the tab.</p>}
+      <InstallButton />
       <div className="cs-coins"><span>🪙 {meta.coins.toLocaleString()}</span><small>legacy coins · {meta.careers} careers started</small></div>
     </section>
     <section className="cs-menu-body">
@@ -127,5 +130,19 @@ function PotentialOdds({ meta }: { meta: Meta }) {
     <div>{POTENTIAL_TIERS.map((t, i) => <span key={t.name} className={i > max ? 'locked' : ''}>
       <b>{t.name}</b>{i > max ? <small>🔒 {i === 3 ? 'Talent Pool I' : 'Talent Pool II'}</small> : <small>{(odds[i] / total * 100).toFixed(i === 5 ? 1 : 0)}%</small>}
     </span>)}</div>
+  </div>;
+}
+
+function InstallButton() {
+  const [state, setState] = useState(installState());
+  const [help, setHelp] = useState(false);
+  useEffect(() => onInstallChange(() => setState(installState())), []);
+  if (state === 'standalone') return null;
+  return <div className="cs-install">
+    <button onClick={async () => { if (state === 'ready') await promptInstall(); else setHelp(true); }}>⬇ Install the app</button>
+    <small>Plays offline, full screen, saves stay on this device.</small>
+    {help && <Modal title="Install Tennis Stars" onClose={() => setHelp(false)}>
+      {state === 'ios' ? <p>In Safari, tap the Share button, then <b>Add to Home Screen</b>.</p> : <p>Use your browser menu and choose <b>Install app</b> (or <b>Add to Home screen</b>). In Chrome and Edge it is also the install icon in the address bar.</p>}
+    </Modal>}
   </div>;
 }
