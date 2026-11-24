@@ -143,3 +143,43 @@ export const PACKS: Record<PackTier, { name: string; cards: number; odds: Record
 };
 
 export type { CardDef };
+
+// ---------------------------------------------------------------------------
+// Week slots: a week without a tournament has three slots.
+// ---------------------------------------------------------------------------
+export const SLOT_ACTIVITIES: { kind: 'rest' | 'train' | 'sponsor' | 'media' | 'recovery' | 'video'; label: string; icon: string; desc: string }[] = [
+  { kind: 'rest', label: 'Rest', icon: '🛌', desc: 'Recover fatigue and health.' },
+  { kind: 'train', label: 'Training', icon: '🏋', desc: 'A third of a training week: pick a focus and an intensity.' },
+  { kind: 'recovery', label: 'Recovery session', icon: '🧊', desc: 'Ice, massage, physio: extra fatigue recovery. $150 (free with a physio).' },
+  { kind: 'video', label: 'Video study', icon: '📺', desc: 'Tactics and mentality grow a little. Light on the body.' },
+  { kind: 'sponsor', label: 'Sponsor work', icon: '💼', desc: 'Shoots and appearances: money, a little fatigue. Pays more as you rise.' },
+  { kind: 'media', label: 'Media day', icon: '🎙', desc: 'Interviews and social media: fame and a little confidence.' },
+];
+export const RECOVERY_SLOT_COST = 150;
+
+// ---------------------------------------------------------------------------
+// Equipment, bought with prize money. Permanent and stackable across slots
+// (one item per slot); it can lift a skill slightly past your potential.
+// ---------------------------------------------------------------------------
+export interface EquipmentDef { id: string; slot: 'racquet' | 'strings' | 'shoes' | 'body' | 'tech'; name: string; icon: string; price: number; desc: string; skills: Partial<Record<SkillKey, number>>; recovery?: number; injury?: number }
+export const EQUIPMENT: EquipmentDef[] = [
+  { id: 'rq-1', slot: 'racquet', name: 'Tour racquet', icon: '🎾', price: 2500, desc: '+1 Serve, +1 Forehand.', skills: { serve: 1, forehand: 1 } },
+  { id: 'rq-2', slot: 'racquet', name: 'Pro-stock frame', icon: '🎾', price: 18000, desc: '+2 Serve, +2 Forehand, +1 Backhand.', skills: { serve: 2, forehand: 2, backhand: 1 } },
+  { id: 'rq-3', slot: 'racquet', name: 'Custom-weighted frame', icon: '🎾', price: 90000, desc: '+3 Serve, +3 Forehand, +2 Backhand.', skills: { serve: 3, forehand: 3, backhand: 2 } },
+  { id: 'st-1', slot: 'strings', name: 'Hybrid strings', icon: '🧵', price: 1800, desc: '+1 Return, +1 Backhand.', skills: { return: 1, backhand: 1 } },
+  { id: 'st-2', slot: 'strings', name: 'Natural gut, stringer on tour', icon: '🧵', price: 25000, desc: '+2 Return, +2 Backhand, +1 Volley.', skills: { return: 2, backhand: 2, volley: 1 } },
+  { id: 'sh-1', slot: 'shoes', name: 'Court shoes', icon: '👟', price: 1200, desc: '+1 Footwork.', skills: { footwork: 1 } },
+  { id: 'sh-2', slot: 'shoes', name: 'Custom insoles and surface-specific shoes', icon: '👟', price: 15000, desc: '+2 Footwork, +1 Endurance, injury risk −10%.', skills: { footwork: 2, endurance: 1 }, injury: 0.1 },
+  { id: 'bd-1', slot: 'body', name: 'Recovery boots', icon: '🦵', price: 6000, desc: 'Recover 3 more fatigue every week.', skills: {}, recovery: 3 },
+  { id: 'bd-2', slot: 'body', name: 'Home cryo and altitude tent', icon: '❄', price: 60000, desc: 'Recover 6 more fatigue every week, +1 Endurance.', skills: { endurance: 1 }, recovery: 6 },
+  { id: 'tc-1', slot: 'tech', name: 'Match-analysis subscription', icon: '📊', price: 4000, desc: '+1 Tactics.', skills: { tactics: 1 } },
+  { id: 'tc-2', slot: 'tech', name: 'Personal data analyst', icon: '🧮', price: 40000, desc: '+2 Tactics, +1 Mentality, +1 Return.', skills: { tactics: 2, mentality: 1, return: 1 } },
+];
+export const EQUIPMENT_MAP: Record<string, EquipmentDef> = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
+
+/** Card packs for sale (bought with money). */
+export const PACK_PRICES: Record<PackTier, number> = { bronze: 2500, silver: 9000, gold: 32000, elite: 110000 };
+
+/** Creation: a few points to put into skills beyond your style. Each point is +1 start and +1 potential. */
+export const CREATION_POINTS = 8;
+export const CREATION_MAX_PER_SKILL = 3;

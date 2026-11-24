@@ -2,6 +2,7 @@ import { simulateMatch, effectiveStrength } from './match.js';
 import { clamp } from './random.js';
 import { fullName, addFame } from './generation.js';
 import { recordRivalryMeeting } from './rivalries.js';
+import { REGION } from '../career/data.ts';
 
 const ROUND_NAMES={128:['R128','R64','R32','R16','QF','SF','F'],64:['R64','R32','R16','QF','SF','F'],32:['R32','R16','QF','SF','F'],16:['R16','QF','SF','F'],8:['QF','SF','F']};
 
@@ -198,13 +199,22 @@ export function simulateSinglesEvent(players,event,unavailable,rng,universe=null
 }
 
 function juniorStrength(player,event){return player.currentRating+((player.surfaceAffinity[event.surface]||70)-70)*.12+(player.shape-50)*.05-player.fatigue*.06;}
-function juniorPointsFor(level,round){const max={'Junior Slam':1000,'Junior Finals':750,'Junior 500':500,Continental:400}[level]||300;const fraction={W:1,F:.62,SF:.36,QF:.2,R16:.1,R32:.04}[round]||0;return Math.round(max*fraction);}
+function juniorPointsFor(level,round){const max={'Junior Slam':1000,'Junior Finals':750,'Junior 500':500,Continental:400,'Junior 200':200}[level]||300;const fraction={W:1,F:.62,SF:.36,QF:.2,R16:.1,R32:.04}[round]||0;return Math.round(max*fraction);}
 function juniorSeededOrder(entries,rng){const sorted=[...entries].sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999));const seeds=sorted.slice(0,Math.min(8,Math.floor(entries.length/4))),rest=rng.shuffle(sorted.slice(seeds.length)),draw=new Array(entries.length);seeds.forEach((p,i)=>{let pos=Math.floor((i+.5)*entries.length/seeds.length);while(draw[pos])pos=(pos+1)%draw.length;draw[pos]=p;});let c=0;for(let i=0;i<draw.length;i+=1)if(!draw[i])draw[i]=rest[c++];return draw;}
 // The career player's junior record is kept apart from their professional one.
 function juniorStat(p,won){if(p.controlled){p.juniorRecord??={wins:0,losses:0,titles:0};if(won)p.juniorRecord.wins+=1;else p.juniorRecord.losses+=1;return;}if(won){p.season.matches+=1;p.season.wins+=1;p.career.matches+=1;p.career.wins+=1;}else{p.season.matches+=1;p.season.losses+=1;p.career.matches+=1;p.career.losses+=1;}}
 export function simulateJuniorEvent(juniors,event,rng,forced=[]){
   const forcedIds=new Set(forced.map(p=>p.id));
-  const others=[...juniors].filter(p=>!forcedIds.has(p.id)&&!p.controlled).sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)||(juniorStrength(b,event)+rng.normal(0,1.5))-(juniorStrength(a,event)+rng.normal(0,1.5)));
+  // Junior fields vary: continental championships draw from their own region, and not every
+  // top junior travels to every Junior 500 (Slams and the Finals get everyone).
+  const region=c=>REGION[c]??'other';
+  const attends=p=>{if(p.injury?.weeksRemaining>0||p.age>18)return false;if(event.level==='Continental')return region(p.country)===region(event.country);if(event.level==='Junior 200')return region(p.country)===region(event.country)?rng.next()<.45:rng.next()<.08;if(event.level==='Junior 500')return rng.next()<.62;return true;};
+  const all=[...juniors].filter(p=>!forcedIds.has(p.id)&&!p.controlled);
+  const present=all.filter(attends);
+  const byRank=(a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)||(juniorStrength(b,event)+rng.normal(0,1.5))-(juniorStrength(a,event)+rng.normal(0,1.5));
+  // if a field is short, fill it with random juniors from elsewhere (not the top seeds by default)
+  const filler=present.length>=event.drawSize-forced.length?[]:rng.shuffle(all.filter(p=>!present.includes(p)&&p.age<=18)).slice(0,event.drawSize).sort(byRank);
+  const others=[...present.sort(byRank),...filler];
   const entries=[...forced,...others].slice(0,event.drawSize);let alive=juniorSeededOrder(entries,rng);const matches=[],roundNames=ROUND_NAMES[event.drawSize]||ROUND_NAMES[32],exitRound=new Map();
   for(const round of roundNames){const next=[];for(let i=0;i<alive.length;i+=2){const a=alive[i],b=alive[i+1];let real=null;if(a.controlled||b.controlled)real=simulateMatch(a,b,{...event,level:'ITF'},rng,round);const diff=juniorStrength(a,event)-juniorStrength(b,event),winner=real?(real.winnerId===a.id?a:b):rng.next()<1/(1+Math.exp(-diff/7))?a:b,loser=winner.id===a.id?b:a;juniorStat(winner,true);juniorStat(loser,false);winner.shape=clamp(winner.shape+1.3,0,100);loser.shape=clamp(loser.shape+.3,0,100);winner.fatigue=clamp(winner.fatigue+3,0,100);loser.fatigue=clamp(loser.fatigue+2,0,100);matches.push({id:`${event.id}-${round}-${a.id}-${b.id}`,eventId:event.id,year:event.year,week:event.week,tour:event.tour,round,surface:event.surface,playerA:a.id,playerB:b.id,winnerId:winner.id,loserId:loser.id,score:real?real.score:rng.next()<.55?'6-3 6-4':'7-6 4-6 6-3',sets:real?real.sets:2,totalGames:real?real.totalGames:19,durationMinutes:real?real.durationMinutes:95,setDetails:real?.setDetails,tags:real?.tags});exitRound.set(loser.id,round);next.push(winner);}alive=next;}
   const champion=alive[0],finalMatch=matches[matches.length-1],finalist=entries.find(p=>p.id===finalMatch?.loserId);for(const p of entries){const round=p.id===champion.id?'W':exitRound.get(p.id)||roundNames[0];p.juniorPoints=(p.juniorPoints||0)+juniorPointsFor(event.level,round);p.season.results.push({eventId:event.id,event:event.name,level:event.level,surface:event.surface,round,points:juniorPointsFor(event.level,round),week:event.week});p.season.tournaments+=1;}if(champion.controlled){champion.juniorRecord.titles=(champion.juniorRecord.titles||0)+1;(champion.juniorRecord.titleLog??=[]).push({year:event.year,event:event.name,level:event.level});}else{champion.season.titles+=1;champion.career.titles+=1;}addFame(champion,event.level==='Junior Slam'?8:event.level==='Junior Finals'?6:3);return {id:event.id,event:{...event,status:'completed'},championId:champion.id,finalistId:finalist?.id,championName:fullName(champion),finalistName:finalist?fullName(finalist):'',championCountry:champion.country,finalistCountry:finalist?.country,matches,entryIds:entries.map(p=>p.id),seeds:entries.slice().sort((a,b)=>(a.juniorRanking||999)-(b.juniorRanking||999)).slice(0,8).map((p,i)=>({id:p.id,rank:i+1,name:fullName(p)}))};

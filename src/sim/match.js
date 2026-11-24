@@ -39,6 +39,15 @@ const STYLE_COUNTERS = {
   'Precision attacker': { 'Serve-and-volley': 3, 'Counterpuncher': -1 },
 };
 
+// Serve/return and other in-match skill checks use the player's age-adjusted level.
+// Chronicle juniors carry adult-level raw skills scaled by an age multiplier; without
+// this, a 15-year-old serves like a pro in the hold model. Prime-age pros (multiplier ≈ 1) barely change.
+function sk(player, key) {
+  const raw = player.skills?.[key] ?? 70;
+  const m = player.controlled ? 1 : (player.currentMultiplier ?? 1);
+  return raw * Math.min(1, m);
+}
+
 function baseSkill(player, surface) {
   const s = player.skills;
   const surfaceWeights = {
@@ -140,9 +149,9 @@ export function effectiveStrength(player, opponent, surface, setIndex = 0, bestO
   const shape = (player.shape - 55) * 0.10;
   const health = (player.health - 90) * 0.08;
   const fatiguePenalty = player.fatigue * (0.10 + setIndex * 0.012);
-  const lateSetEndurance = setIndex >= 2 ? ((player.skills.endurance - 70) * 0.10 * (bestOf === 5 ? 1.45 : 0.65)) : 0;
-  const mentality = (player.skills.mentality - 70) * 0.035;
-  const tactics = (player.skills.tactics - 70) * 0.025;
+  const lateSetEndurance = setIndex >= 2 ? ((sk(player,'endurance') - 70) * 0.10 * (bestOf === 5 ? 1.45 : 0.65)) : 0;
+  const mentality = (sk(player,'mentality') - 70) * 0.035;
+  const tactics = (sk(player,'tactics') - 70) * 0.025;
   const rarityEdge = player.controlled ? 0 : (RARITY_MATCH_EDGE[player.rarity] || 0);
   const form = formEdge(player);
   const persona = ctx ? personalityEdge(player, opponent, ctx) : 0;
@@ -152,8 +161,8 @@ export function effectiveStrength(player, opponent, surface, setIndex = 0, bestO
 
 function holdProbability(server, returner, surface, strengthDiff) {
   const speed = surface === 'Grass' ? 0.045 : surface === 'Indoor' ? 0.04 : surface === 'Hard' ? 0.02 : -0.025;
-  const serveEdge = (server.skills.serve - returner.skills.return) / 230;
-  const volleyEdge = surface === 'Grass' || surface === 'Indoor' ? (server.skills.volley - 70) / 800 : 0;
+  const serveEdge = (sk(server,'serve') - sk(returner,'return')) / 230;
+  const volleyEdge = surface === 'Grass' || surface === 'Indoor' ? (sk(server,'volley') - 70) / 800 : 0;
   return clamp(0.61 + speed + serveEdge + volleyEdge + strengthDiff / 320, 0.43, 0.91);
 }
 
@@ -170,7 +179,7 @@ function simulateSet(playerA, playerB, surface, strengthA, strengthB, rng) {
     const serverGames=serverIsA?gamesA:gamesB,returnerGames=serverIsA?gamesB:gamesA;
     const pressurePoint=(gamesA+gamesB>=8||serverGames>=5||returnerGames>=5);
     const nerve=p=>((p.confidence||0)/420)+((p.personalityTags||[]).includes('Calm competitor')?0.012:0)-((p.personalityTags||[]).includes('Emotional spark')?0.008:0);
-    const pressureModifier=pressurePoint?((server.skills.mentality-returner.skills.mentality)/850+(server.skills.tactics-returner.skills.tactics)/1400+nerve(server)-nerve(returner)):0;
+    const pressureModifier=pressurePoint?((sk(server,'mentality')-sk(returner,'mentality'))/850+(sk(server,'tactics')-sk(returner,'tactics'))/1400+nerve(server)-nerve(returner)):0;
     const servingForSet=serverGames>=5&&serverGames-returnerGames>=1?0.012:0;
     const hold = rng.next() < clamp(holdProbability(server, returner, surface, diff)+pressureModifier+servingForSet,0.38,0.94);
     const aWinsGame = serverIsA ? hold : !hold;
@@ -179,8 +188,8 @@ function simulateSet(playerA, playerB, surface, strengthA, strengthB, rng) {
     servers.push(serverIsA ? 'A' : 'B');
     if ((gamesA >= 6 || gamesB >= 6) && Math.abs(gamesA - gamesB) >= 2) break;
     if (gamesA === 6 && gamesB === 6) {
-      const tieStrengthA = strengthA + playerA.skills.serve * 0.08 + playerA.skills.return * 0.08 + playerA.skills.mentality * 0.07 + ((playerA.specials || []).includes('tiebreak-ace') ? 4 : 0);
-      const tieStrengthB = strengthB + playerB.skills.serve * 0.08 + playerB.skills.return * 0.08 + playerB.skills.mentality * 0.07 + ((playerB.specials || []).includes('tiebreak-ace') ? 4 : 0);
+      const tieStrengthA = strengthA + sk(playerA,'serve') * 0.08 + sk(playerA,'return') * 0.08 + sk(playerA,'mentality') * 0.07 + ((playerA.specials || []).includes('tiebreak-ace') ? 4 : 0);
+      const tieStrengthB = strengthB + sk(playerB,'serve') * 0.08 + sk(playerB,'return') * 0.08 + sk(playerB,'mentality') * 0.07 + ((playerB.specials || []).includes('tiebreak-ace') ? 4 : 0);
       const pA = 1 / (1 + Math.exp(-(tieStrengthA - tieStrengthB) / 10));
       if (rng.next() < pA) { gamesA = 7; log.push('A'); } else { gamesB = 7; log.push('B'); }
       break;
@@ -234,8 +243,8 @@ export function simulateMatch(playerA, playerB, event, rng, round) {
     else { flowB = clamp(flowB + swing, -2, 2); flowA = clamp(flowA - swing * 0.5, -2, 2); }
     sets.push([set.gamesA, set.gamesB]);
     setDetails.push({gamesA:set.gamesA,gamesB:set.gamesB,gameWinners:[...set.log],servers:[...set.servers],setsBefore:[setsA-(set.winner==='A'?1:0),setsB-(set.winner==='B'?1:0)]});
-    const enduranceCostA = set.games * (1.22 - playerA.skills.endurance / 180);
-    const enduranceCostB = set.games * (1.22 - playerB.skills.endurance / 180);
+    const enduranceCostA = set.games * (1.22 - sk(playerA,'endurance') / 180);
+    const enduranceCostB = set.games * (1.22 - sk(playerB,'endurance') / 180);
     playerA.fatigue = clamp(playerA.fatigue + enduranceCostA * (event.surface === 'Clay' ? 1.13 : 1), 0, 100);
     playerB.fatigue = clamp(playerB.fatigue + enduranceCostB * (event.surface === 'Clay' ? 1.13 : 1), 0, 100);
   }

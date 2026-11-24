@@ -16,13 +16,14 @@ const { ensureUniverseData } = M as any;
 const { projectCareerEntries } = T as any;
 const { simulateMatch } = MM as any;
 import {
+  EQUIPMENT_MAP, PACK_PRICES, RECOVERY_SLOT_COST, CREATION_POINTS, CREATION_MAX_PER_SKILL,
   SKILL_KEYS, FOCUS_MAP, INTENSITY, STAFF, COACH_GROWTH, PRIZE, DOUBLES_PRIZE_SHARE, ROUND_ORDER, ROUND_NAME,
   travelCost, LIVING_COST, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier, STYLE_CEILING, STYLE_SURFACE, SPECIAL_MAP, PACKS, SKILL_LABEL,
 } from './data';
 import { CARD_LIST, CARD_MAP, CARD_SELL } from './cards';
 import { MILESTONE_MAP, TITLE_COINS, TRINKET_MAP } from './legacy';
 import { rollDecision, turnProDecision, retirementDecision } from './decisions';
-import type { Career, CareerFx, Decision, Effects, Intensity, MatchLine, PackTier, Rarity, SkillKey, Skills, StaffKey, Surface, Tour, WeekPlan, WeekReport } from './types';
+import type { MatchRecord, SlotPlan, Career, CareerFx, Decision, Effects, Intensity, MatchLine, PackTier, Rarity, SkillKey, Skills, StaffKey, Surface, Tour, WeekPlan, WeekReport } from './types';
 
 export const CAREER_VERSION = 1;
 export const START_YEAR = 2026;
@@ -30,7 +31,7 @@ export const START_YEAR = 2026;
 export interface CareerSetup {
   firstName: string; lastName: string; tour: Tour; country: string;
   handedness: 'Right' | 'Left'; backhand: 'Two-handed' | 'One-handed'; style: string; startAge: 15 | 16;
-  trinkets: string[]; upgrades: Record<string, number>; seed?: number; soloTour?: boolean; forceTier?: string;
+  trinkets: string[]; upgrades: Record<string, number>; seed?: number; soloTour?: boolean; forceTier?: string; alloc?: Partial<Skills>;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,14 +67,25 @@ export function sponsorIncome(p: any) {
 }
 export function declineAge(c: Career) { return 29 + c.fx.prime; }
 
-/** The skills the match engine sees: base + this week's boost. */
+export function equipmentBonus(c: Career) {
+  const skills: Partial<Skills> = {}; let recovery = 0, injury = 0;
+  for (const id of c.equipment ?? []) {
+    const e = EQUIPMENT_MAP[id]; if (!e) continue;
+    for (const [k, v] of Object.entries(e.skills)) skills[k as SkillKey] = (skills[k as SkillKey] ?? 0) + (v as number);
+    recovery += e.recovery ?? 0; injury += e.injury ?? 0;
+  }
+  return { skills, recovery, injury };
+}
+
+/** The skills the match engine sees: base + equipment + the active tournament boost. */
 export function applySkills(u: any) {
   const c = careerOf(u), p = me(u);
   if (!p) return;
   const b = c.boost;
+  const eq = equipmentBonus(c).skills;
   for (const k of SKILL_KEYS) {
-    const add = b ? (b.skills[k] ?? 0) : 0;
-    p.skills[k] = clamp(Math.round(c.base[k] + add), 25, 100);
+    const add = (b ? (b.skills[k] ?? 0) : 0) + (eq[k] ?? 0);
+    p.skills[k] = clamp(Math.round((c.base[k] + add) * (1 + (b?.pct ?? 0))), 25, 100);
   }
   p.specials = [...c.specials];
   p.boostEdge = b ? b.edge : 0;
@@ -150,11 +162,15 @@ export function createCareer(setup: CareerSetup) {
   const ceilBonus = trinketFx.reduce((s, t) => s + (t.ceiling ?? 0), 0) + ([0, 1, 2, 4][up.gifted ?? 0] ?? 0);
   const styleBoost = STYLE_CEILING[setup.style] || {};
   const ceiling = {} as Skills, base = {} as Skills;
-  const startFrac = setup.startAge === 15 ? 0.6 : 0.64;
+  // a new 15-year-old starts level with the other 15-year-olds of the same talent
+  const startFrac = setup.startAge === 15 ? 0.68 : 0.72;
   const startBonus = trinketFx.reduce((s, t) => s + (t.start ?? 0), 0) + (up.academy ?? 0) * 2;
+  // creation points: +1 start and +1 potential each (a few, capped per skill)
+  const alloc: Partial<Skills> = {}; let left = CREATION_POINTS;
+  for (const k of SKILL_KEYS) { const v = Math.max(0, Math.min(CREATION_MAX_PER_SKILL, Math.round(setup.alloc?.[k] ?? 0), left)); alloc[k] = v; left -= v; }
   for (const k of SKILL_KEYS) {
-    ceiling[k] = clamp(Math.round(avg + (styleBoost[k] ?? 0) + rng.normal(0, 3) + ceilBonus), 45, 99);
-    base[k] = clamp(r1(ceiling[k] * startFrac + rng.normal(0, 2.2) + startBonus), 28, ceiling[k]);
+    ceiling[k] = clamp(Math.round(avg + (styleBoost[k] ?? 0) + rng.normal(0, 3) + ceilBonus + (alloc[k] ?? 0)), 45, 99);
+    base[k] = clamp(r1(ceiling[k] * startFrac + rng.normal(0, 2.2) + startBonus + (alloc[k] ?? 0)), 28, ceiling[k]);
   }
 
   // the player: a Chronicle junior record, reshaped
@@ -195,6 +211,7 @@ export function createCareer(setup: CareerSetup) {
     seasonPrize: 0, totalPrize: 0, milestones: {}, counters: {}, coinEvents: [], coinsTotal: 0, fx,
     trinkets: [...setup.trinkets], noInjuryUntilYear: noInj ? START_YEAR + noInj - 1 : 0, seasonReview: null,
     retired: false, legacy: null, seed: rng.seed, uid: 1,
+    matchLog: [], tournamentLog: [], unlocks: [], skillLog: [], equipment: [], watched: {},
   };
   u.career = c;
   u.followedPlayerIds = [p.id];
@@ -211,7 +228,7 @@ export function createCareer(setup: CareerSetup) {
 export interface EventOption { event: any; status: string; note: string; travel: number; doublesOk: boolean; position?: number; cutoffRank?: number | null; qualifyingCutoffRank?: number | null }
 
 const JUNIOR_ENTRY: Record<string, { direct: number; quali: number }> = {
-  'Junior Slam': { direct: 24, quali: 60 }, 'Junior Finals': { direct: 12, quali: 12 }, 'Junior 500': { direct: 28, quali: 72 }, Continental: { direct: 40, quali: 120 },
+  'Junior Slam': { direct: 28, quali: 70 }, 'Junior Finals': { direct: 12, quali: 12 }, 'Junior 500': { direct: 36, quali: 90 }, Continental: { direct: 40, quali: 120 }, 'Junior 200': { direct: 70, quali: 140 },
 };
 
 export function weekEvents(u: any, year = u.year, week = u.week) {
@@ -250,7 +267,7 @@ export function projectWeek(u: any, week = u.week): EventOption[] {
 }
 import { REGION } from './data';
 function regionOf(code: string) { return REGION[code] ?? 'other'; }
-export function levelRank(level: string) { return ({ 'Grand Slam': 100, Olympics: 98, Finals: 94, '1000': 86, '500': 65, '250': 45, Challenger: 28, 'WTA 125': 28, ITF: 15, 'Junior Slam': 40, 'Junior Finals': 38, 'Junior 500': 26, Continental: 20 } as Record<string, number>)[level] ?? 10; }
+export function levelRank(level: string) { return ({ 'Grand Slam': 100, Olympics: 98, Finals: 94, '1000': 86, '500': 65, '250': 45, Challenger: 28, 'WTA 125': 28, ITF: 15, 'Junior Slam': 40, 'Junior Finals': 38, 'Junior 500': 26, Continental: 20, 'Junior 200': 18 } as Record<string, number>)[level] ?? 10; }
 
 // ---------------------------------------------------------------------------
 // Turn flow
@@ -262,14 +279,14 @@ export function beginWeek(u: any) {
   if (u.week % 2 === 0) c.cardPlays = Math.min(maxPlays(c), c.cardPlays + 1);
   const key = wk(u.year, u.week);
   const planned = c.plan[key];
-  if (p.injury?.weeksRemaining > 0) c.current = { kind: 'rest' };
+  if (p.injury?.weeksRemaining > 0) c.current = restWeek();
   else if (planned) c.current = planned;
-  else c.current = { kind: 'train', ...c.defaultTrain };
+  else c.current = restWeek();
   if (planned) delete c.plan[key];
   // validate a planned event is still available
   if (c.current.kind === 'compete' || c.current.kind === 'junior') {
     const ev = projectWeek(u).find((o) => o.event.id === (c.current as any).eventId);
-    if (!ev) c.current = { kind: 'train', ...c.defaultTrain };
+    if (!ev) c.current = restWeek();
   }
   if (!c.decision) {
     if (p.age === 17 && !c.turnedPro && !c.counters['asked-pro'] && u.week >= 2) { c.counters['asked-pro'] = 1; c.decision = turnProDecision(); }
@@ -280,13 +297,28 @@ export function beginWeek(u: any) {
 }
 
 export function setPlan(u: any, plan: WeekPlan) { careerOf(u).current = plan; }
+export const restWeek = (): WeekPlan => ({ kind: 'slots', slots: [{ kind: 'rest' }, { kind: 'rest' }, { kind: 'rest' }] });
+export function slotLabel(sl: SlotPlan) {
+  if (sl.kind === 'train') return `${FOCUS_MAP[sl.focus]?.label ?? 'Training'} (${INTENSITY[sl.intensity].label.toLowerCase()})`;
+  return ({ rest: 'Rest', sponsor: 'Sponsor work', media: 'Media day', recovery: 'Recovery', video: 'Video study' } as Record<string, string>)[sl.kind];
+}
+function groupLabels(xs: string[]) { const out: string[] = []; for (const x of xs) { const i = out.findIndex((o) => o.replace(/ ×\d$/, '') === x); if (i >= 0) { const n = Number(/ ×(\d)$/.exec(out[i])?.[1] ?? 1) + 1; out[i] = `${x} ×${n}`; } else out.push(x); } return out.join(' · '); }
+/** Legacy whole-week plans become slot weeks. */
+export function asSlots(plan: WeekPlan): SlotPlan[] | null {
+  if (plan.kind === 'slots') return plan.slots;
+  if (plan.kind === 'rest') return [{ kind: 'rest' }, { kind: 'rest' }, { kind: 'rest' }];
+  if (plan.kind === 'train') return [0, 1, 2].map(() => ({ kind: 'train', focus: plan.focus, intensity: plan.intensity }));
+  return null;
+}
 
 export function resolveDecision(u: any, optionId: string): string[] {
   const c = careerOf(u), d = c.decision;
   if (!d) return [];
   const opt = d.options.find((o) => o.id === optionId) ?? d.options[0];
   c.decision = null;
+  const before = [...c.specials];
   const notes = applyEffects(u, opt.effects);
+  logNewSpecials(u, before);
   applySkills(u);
   return notes;
 }
@@ -329,7 +361,7 @@ export function playWeek(u: any, { live }: { live: boolean }): 'live' | 'done' |
   const c = careerOf(u), p = me(u);
   if (!p || c.retired || u.seasonEnded || u.liveEvent) return 'blocked';
   if (c.decision) return 'blocked';
-  const plan: WeekPlan = p.injury?.weeksRemaining > 0 ? { kind: 'rest' } : c.current;
+  const plan: WeekPlan = p.injury?.weeksRemaining > 0 ? restWeek() : c.current;
   const rng = rngOf(c);
   p.entryEventId = null; p.juniorEntryEventId = null; p.doublesEntryEventId = null; p.wildcardEventId = null;
   let entryNote: string | undefined;
@@ -357,7 +389,7 @@ export function playWeek(u: any, { live }: { live: boolean }): 'live' | 'done' |
           const m = simulateMatch(p, opp, { ...ev, level: 'ITF', id: `${ev.id}-q` }, rng, 'Q');
           const won = m.winnerId === p.id;
           c.counters['jq-' + ev.id] = won ? 1 : 0;
-          (u.careerJuniorQuali ??= {})[ev.id] = { opponentId: opp.id, opponent: fullName(opp), won, score: m.score };
+          (u.careerJuniorQuali ??= {})[ev.id] = { opponentId: opp.id, opponent: fullName(opp), won, score: m.score, match: m, event: ev };
           if (won) p.juniorEntryEventId = ev.id;
           entryNote = won ? `Qualified (beat ${fullName(opp)} ${m.score}).` : `Lost in junior qualifying to ${fullName(opp)} ${m.score}.`;
         }
@@ -450,7 +482,7 @@ const r1Precise = (v: number) => Math.round(v * 1000) / 1000;
 function injuryRoll(c: Career, p: any, base: number, rng: any, notes: string[]) {
   if (p.injury || c.noInjuryUntilYear >= (p.season?.year ?? 0)) return;
   const fat = (p.fatigue || 0) / 100;
-  const chance = base * (1 + fat * 3) * (1 - c.fx.injury) * (1 - 0.12 * c.staff.physio);
+  const chance = base * (1 + fat * 3) * (1 - c.fx.injury) * (1 - 0.12 * c.staff.physio) * (1 - equipmentBonus(c).injury);
   if (rng.next() >= chance) return;
   const severe = rng.next() < 0.2;
   const weeks = severe ? rng.int(6, 14) : rng.int(1, 4);
@@ -488,12 +520,15 @@ export function finishWeek(u: any) {
   const notes: string[] = [], rewards: string[] = [], matches: MatchLine[] = [];
   const plan = pw.plan;
   let prize = 0, costs = LIVING_COST + weeklyStaffCost(c), income = 0, entry: string | undefined = pw.entryNote, result: string = '';
-  let title = plan.kind === 'train' ? `Training · ${FOCUS_MAP[plan.focus]?.label ?? ''} (${INTENSITY[plan.intensity].label})` : plan.kind === 'rest' ? (p.injury ? 'Rehab' : 'Rest week') : '';
+  const slots = asSlots(plan);
+  let title = slots ? (p.injury && slots.every((x) => x.kind === 'rest') ? 'Rehab' : slots.every((x) => x.kind === 'rest') ? 'Rest week' : groupLabels(slots.map(slotLabel))) : '';
+  let competed = false;
+  const specialsBefore = [...c.specials];
   let residual = 0; // share of a training week left after the tournament
   const byId = (id: string) => u.players[c.tour].find((x: any) => x.id === id) || u.juniors[c.tour].find((x: any) => x.id === id) || u.doublesPlayers[c.tour].find((x: any) => x.id === id);
   const oppLine = (m: any, extra: Partial<MatchLine>, eventName: string, level: string): MatchLine => {
     const oppId = m.winnerId === p.id ? m.loserId : m.winnerId; const o = byId(oppId);
-    return { eventName, level, round: m.round, opponent: o ? fullName(o) : 'Unknown', opponentRank: o?.ranking ?? 999, won: m.winnerId === p.id, score: m.winnerId === p.id ? m.score : flipScore(m.score), ...extra };
+    return { eventName, level, round: m.round, opponent: o ? fullName(o) : 'Unknown', opponentRank: o?.ranking ?? 999, won: m.winnerId === p.id, score: m.winnerId === p.id ? m.score : flipScore(m.score), matchId: String(m.id), ...extra };
   };
 
   if (plan.kind === 'compete') {
@@ -503,6 +538,7 @@ export function finishWeek(u: any) {
     const quali = (ed?.qualifyingMatches || []).filter((m: any) => m.playerA === p.id || m.playerB === p.id);
     for (const m of quali) matches.push(oppLine(m, { qualifying: true }, ev.name, ev.level));
     const inDraw = ed && (ed.entryIds || []).includes(p.id);
+    if (inDraw) for (const m of quali) trackMatch(u, c, p, m, ev, { qualifying: true });
     const travelled = inDraw || quali.length > 0;
     if (ev && travelled) costs += travelCost(p.country, ev.country);
     if (inDraw) {
@@ -512,7 +548,8 @@ export function finishWeek(u: any) {
       const res = (p.season.results || []).filter((r: any) => r.eventId === ev.id).at(-1);
       result = res?.round ?? 'R32';
       const mine = (ed.matches || []).filter((m: any) => m.playerA === p.id || m.playerB === p.id);
-      for (const m of mine) { matches.push(oppLine(m, {}, ev.name, ev.level)); trackMatch(u, c, p, m, ev); }
+      for (const m of mine) { matches.push(oppLine(m, {}, ev.name, ev.level)); trackMatch(u, c, p, m, ev, {}); }
+      competed = true;
       prize += PRIZE[ev.level]?.[result] ?? 0;
       residual = result === 'W' || result === 'F' ? 0 : result === 'SF' ? 0.1 : result === 'QF' ? 0.2 : 0.4;
       if (result === 'W') titleRewards(u, c, p, ev, rewards);
@@ -526,7 +563,8 @@ export function finishWeek(u: any) {
       entry = 'Qualifying'; result = 'Q';
       prize += PRIZE[ev.level]?.Q ?? 0;
       residual = 0.55;
-      for (const m of quali) trackMatch(u, c, p, m, ev);
+      for (const m of quali) trackMatch(u, c, p, m, ev, { qualifying: true });
+      competed = true;
     } else {
       entry = entry ?? 'Not accepted'; result = '';
       notes.push(`Not accepted into ${ev?.name ?? 'the event'}. The week became training.`);
@@ -551,13 +589,14 @@ export function finishWeek(u: any) {
     const ev = u.juniorCalendar.find((e: any) => e.id === plan.eventId);
     title = ev ? ev.name : 'Junior event';
     const q = u.careerJuniorQuali?.[plan.eventId];
-    if (q) { matches.push({ eventName: ev.name, level: ev.level, round: 'Q', opponent: q.opponent, opponentRank: 0, won: q.won, score: q.won ? q.score : flipScore(q.score), junior: true, qualifying: true }); delete u.careerJuniorQuali[plan.eventId]; }
+    if (q) { if (q.match) trackMatch(u, c, p, q.match, ev, { junior: true, qualifying: true }); competed = true; matches.push({ eventName: ev.name, level: ev.level, round: 'Q', opponent: q.opponent, opponentRank: 0, won: q.won, score: q.won ? q.score : flipScore(q.score), junior: true, qualifying: true, matchId: q.match ? String(q.match.id) : undefined }); delete u.careerJuniorQuali[plan.eventId]; }
     const ed = (u.juniorEditions || []).find((e: any) => e.id === plan.eventId);
     if (ev && (ed?.entryIds?.includes(p.id) || q)) costs += Math.round(travelCost(p.country, ev.country) * 0.7);
     if (ed && ed.entryIds.includes(p.id)) {
-      entry = entry ?? 'Main draw';
+      entry = q ? 'Qualifier' : 'Main draw';
       const mine = (ed.matches || []).filter((m: any) => m.playerA === p.id || m.playerB === p.id);
-      for (const m of mine) { const line = oppLine(m, { junior: true }, ev.name, ev.level); line.opponentRank = byId(line.won ? m.loserId : m.winnerId)?.juniorRanking ?? 0; matches.push(line); trackMatch(u, c, p, m, ev); }
+      for (const m of mine) { const line = oppLine(m, { junior: true }, ev.name, ev.level); line.opponentRank = byId(line.won ? m.loserId : m.winnerId)?.juniorRanking ?? 0; matches.push(line); trackMatch(u, c, p, m, ev, { junior: true }); }
+      competed = true;
       const res = (p.season.results || []).filter((r: any) => r.eventId === ev.id).at(-1);
       result = res?.round ?? '';
       residual = result === 'W' || result === 'F' ? 0 : 0.35;
@@ -571,14 +610,33 @@ export function finishWeek(u: any) {
     } else { residual = 0.75; if (!q) notes.push('Not accepted into the junior event.'); }
   }
 
-  // training / rest
-  if (plan.kind === 'train') train(c, p, plan.focus, plan.intensity, 1, rng, notes);
-  else if (plan.kind === 'rest') {
-    const rec = 14 + c.staff.physio * 5;
-    p.fatigue = clamp(p.fatigue - rec, 0, 100);
-    p.health = clamp(p.health + 2 + c.staff.physio, 30, 100);
-    if (p.injury?.weeksRemaining > 0 && c.staff.physio >= 2 && rng.next() < 0.25 * (c.staff.physio - 1)) { p.injury.weeksRemaining = Math.max(0, p.injury.weeksRemaining - 1); notes.push('Your physio sped up the rehab by a week.'); }
+  // the three slots of a week without a tournament
+  if (slots) {
+    for (const sl of slots) {
+      if (sl.kind === 'rest' || p.injury) {
+        p.fatigue = clamp(p.fatigue - (14 + c.staff.physio * 5) / 3, 0, 100);
+        p.health = clamp(p.health + (2 + c.staff.physio) / 3, 30, 100);
+      } else if (sl.kind === 'train') train(c, p, sl.focus, sl.intensity, 1 / 3, rng, notes);
+      else if (sl.kind === 'recovery') {
+        p.fatigue = clamp(p.fatigue - 8 - c.staff.physio * 2, 0, 100); p.health = clamp(p.health + 1, 30, 100);
+        if (!c.staff.physio) costs += RECOVERY_SLOT_COST;
+      } else if (sl.kind === 'video') train(c, p, 'mental', 'light', 0.45, rng, notes);
+      else if (sl.kind === 'sponsor') {
+        const pay = Math.round((500 + (p.fame || 0) * 20 + Math.max(0, 250 - (p.rankingPoints > 0 ? p.ranking : 999)) * 25) / 50) * 50;
+        income += pay; p.fatigue = clamp(p.fatigue + 3, 0, 100); addFame(p, 1);
+      } else if (sl.kind === 'media') {
+        addFame(p, 2 + ((p.rankingPoints > 0 && p.ranking <= 100) ? 2 : 0)); p.confidence = clamp((p.confidence || 0) + 0.4, -10, 10); p.fatigue = clamp(p.fatigue + 1, 0, 100);
+      }
+    }
+    if (slots.every((x) => x.kind === 'rest') && p.injury?.weeksRemaining > 0 && c.staff.physio >= 2 && rng.next() < 0.25 * (c.staff.physio - 1)) { p.injury.weeksRemaining = Math.max(0, p.injury.weeksRemaining - 1); notes.push('Your physio sped up the rehab by a week.'); }
   } else if (residual > 0 && !p.injury) train(c, p, c.defaultTrain.focus, 'normal', residual, rng, notes);
+  const eqb = equipmentBonus(c);
+  if (eqb.recovery) p.fatigue = clamp(p.fatigue - eqb.recovery, 0, 100);
+  // tournament history
+  if ((plan.kind === 'compete' || plan.kind === 'junior') && (competed || entry)) {
+    const ev = [...u.calendar, ...u.juniorCalendar].find((e: any) => e.id === plan.eventId);
+    if (ev) c.tournamentLog.push({ year: pw.year, week: pw.week, age: pw.age, event: ev.name, level: ev.level, surface: ev.surface, entry: entry ?? '', result: result || (competed ? 'Q' : '—'), prize, eventId: ev.id, doubles: matches.some((m) => m.doubles) ? (matches.filter((m) => m.doubles).every((m) => m.won) ? 'W' : matches.filter((m) => m.doubles).find((m) => !m.won)?.round ?? null) : null });
+  }
 
   // career-threatening injury hit from the world sim
   if (p.injury?.careerThreatening && !c.counters[`ct-${p.injury.startYear}-${p.injury.startWeek}`]) { c.counters[`ct-${p.injury.startYear}-${p.injury.startWeek}`] = 1; c.base.footwork = Math.max(30, c.base.footwork - 2); }
@@ -586,7 +644,8 @@ export function finishWeek(u: any) {
   decline(c, p);
 
   // boost wears off
-  if (c.boost) { c.boost.weeks -= 1; if (c.boost.weeks <= 0) c.boost = null; }
+  // tournament boosts last until the end of your next tournament(s)
+  if (c.boost && competed) { c.boost.weeks -= 1; if (c.boost.weeks <= 0) c.boost = null; }
 
   // money
   if (c.federation) income += 600;
@@ -612,6 +671,7 @@ export function finishWeek(u: any) {
   for (const [r, id] of [[300, 'top300'], [200, 'top200'], [100, 'top100'], [50, 'top50'], [20, 'top20'], [10, 'top10'], [1, 'no1']] as [number, string][]) if (p.ranking <= r && (p.rankingPoints || 0) > 0) milestone(u, c, id, rewards);
   if (p.ranking === 1) coin(c, 'no1-week', 'A week at No. 1', 15);
   checkSpecials(u, c, p, rewards);
+  logNewSpecials(u, specialsBefore);
   const skillDelta: Partial<Skills> = {};
   for (const k of SKILL_KEYS) { const d = c.base[k] - pw.base[k]; if (Math.abs(d) >= 0.05) skillDelta[k] = Math.round(d * 100) / 100; }
 
@@ -630,15 +690,37 @@ export function finishWeek(u: any) {
   applySkills(u);
 }
 
+export function orientSets(m: any, myId: string) {
+  const flip = m.playerA !== myId;
+  const f = (x: string) => (flip ? (x === 'A' ? 'B' : 'A') : x);
+  return (m.setDetails || []).map((d: any) => ({ gameWinners: (d.gameWinners || []).map(f), servers: (d.servers || []).map(f) }));
+}
+function logMatch(u: any, c: Career, p: any, m: any, ev: any, opp: any, flags: { qualifying?: boolean; junior?: boolean }) {
+  const id = String(m.id);
+  if (c.matchLog.some((r) => r.id === id)) return;
+  const won = m.winnerId === p.id;
+  const rec: MatchRecord = {
+    id, year: ev.year ?? u.year, week: ev.week, event: ev.name, level: ev.level, surface: ev.surface, round: m.round,
+    oppId: opp?.id ?? '', oppName: opp ? fullName(opp) : 'Unknown', oppCountry: opp?.country ?? '', oppRank: flags.junior ? (opp?.juniorRanking ?? 0) : (opp?.ranking ?? 999), myRank: p.ranking,
+    won, score: won ? m.score : flipScore(m.score), sets: orientSets(m, p.id), tags: m.tags || [], minutes: m.durationMinutes || 0, ...flags,
+  };
+  c.matchLog.push(rec);
+  if (c.matchLog.length > 2500) c.matchLog.splice(0, c.matchLog.length - 2500);
+}
+function logNewSpecials(u: any, before: string[]) {
+  const c = careerOf(u), p = me(u);
+  for (const id of c.specials) if (!before.includes(id)) c.unlocks.push({ kind: 'special', id, label: SPECIAL_MAP[id]?.name ?? id, year: u.year, week: u.week, age: p.age });
+}
 function flipScore(score: string) { return String(score || '').split(' ').map((s) => s.split('-').reverse().join('-')).join(' '); }
 function bump(c: Career, k: string, n = 1) { c.counters[k] = (c.counters[k] ?? 0) + n; }
 
-function trackMatch(u: any, c: Career, p: any, m: any, ev: any) {
+function trackMatch(u: any, c: Career, p: any, m: any, ev: any, flags: { qualifying?: boolean; junior?: boolean }) {
   const won = m.winnerId === p.id;
   const oppId = won ? m.loserId : m.winnerId;
-  const opp = u.players[c.tour].find((x: any) => x.id === oppId);
+  const opp = u.players[c.tour].find((x: any) => x.id === oppId) || u.juniors[c.tour].find((x: any) => x.id === oppId);
+  logMatch(u, c, p, m, ev, opp, flags);
   bump(c, won ? 'wins' : 'losses');
-  if (won) milestone(u, c, 'first-win', []);
+  if (won && !flags.junior) milestone(u, c, 'first-win', []);
   if (won && (m.tags || []).includes('comeback')) bump(c, 'comebacks');
   if (won && (m.tags || []).includes('deciding set')) bump(c, 'deciders');
   if (won && opp && opp.ranking <= 20) bump(c, 'top20wins');
@@ -672,6 +754,7 @@ function milestone(u: any, c: Career, id: string, rewards: string[]) {
   if (c.milestones[id]) return;
   const def = MILESTONE_MAP[id]; if (!def) return;
   c.milestones[id] = `${u.year} · week ${u.week}`;
+  c.unlocks.push({ kind: 'milestone', id, label: def.label, year: u.year, week: u.week, age: me(u)?.age ?? 0 });
   coin(c, `m-${id}`, def.label, def.coins);
   c.coinEvents[c.coinEvents.length - 1].milestone = id;
   rewards.push(`🏆 ${def.label} (+${Math.round(def.coins * c.fx.coinMult)} coins)`);
@@ -713,6 +796,7 @@ function seasonEnd(u: any) {
   c.packs.push(tier);
   if (p.ranking <= 10) coin(c, `ye-top10-${u.year}`, `Year-end top 10 (${u.year})`, 200);
   c.seasonReview = { year: u.year };
+  c.skillLog.push({ year: u.year, age: p.age, skills: { ...c.base }, ceiling: { ...c.ceiling } });
   const forced = p.age >= 38 || (p.age >= 33 && p.ranking > 350) || (p.age >= 35 && p.ranking > 200);
   if (forced) c.decision = retirementDecision(p.age, true);
   else if (p.age >= 30) c.decision = retirementDecision(p.age, false);
@@ -820,6 +904,7 @@ export function playCard(u: any, uid: string): string[] {
   c.hand.splice(i, 1); c.cardPlays -= 1;
   const notes: string[] = [];
   const rng = rngOf(c);
+  const before = [...c.specials];
   if (def.kind === 'drill') {
     for (const k of SKILL_KEYS) {
       const add = (def.skills?.[k] ?? 0) + (def.all ?? 0); if (!add) continue;
@@ -830,9 +915,9 @@ export function playCard(u: any, uid: string): string[] {
   } else if (def.kind === 'boost') {
     const skills: Partial<Skills> = { ...(def.skills ?? {}) };
     if (def.all) for (const k of SKILL_KEYS) skills[k] = (skills[k] ?? 0) + def.all;
-    c.boost = { cardId: def.id, name: def.name, skills, edge: def.edge ?? 0, weeks: def.weeks ?? 1 };
+    c.boost = { cardId: def.id, name: def.name, skills, edge: def.edge ?? 0, weeks: def.weeks ?? 1, pct: def.pct ?? 0 };
     if (def.fatigue) p.fatigue = clamp(p.fatigue + def.fatigue, 0, 100);
-    notes.push(`${def.name} active for ${def.weeks ?? 1} week(s).`);
+    notes.push(`${def.name}: active for your next ${(def.weeks ?? 1) > 1 ? `${def.weeks} tournaments` : 'tournament'}.`);
   } else if (def.kind === 'recovery') {
     if (def.fatigue) p.fatigue = clamp(p.fatigue + def.fatigue, 0, 100);
     if (def.health) p.health = clamp(p.health + def.health, 30, 100);
@@ -849,9 +934,29 @@ export function playCard(u: any, uid: string): string[] {
   } else if (def.kind === 'special') unlockSpecial(c, def.special!, notes);
   else if (def.kind === 'money') { c.money += def.money ?? 0; if (def.fatigue) p.fatigue = clamp(p.fatigue + def.fatigue, 0, 100); notes.push(def.desc); }
   else if (def.kind === 'wildcard') { c.wildcardTokens += def.wildcard ?? 1; notes.push(`You hold ${c.wildcardTokens} wildcard token(s).`); }
+  logNewSpecials(u, before);
   saveRng(c, rng);
   applySkills(u);
   return notes;
+}
+
+/** Shop: card packs and equipment bought with money. */
+export function buyPack(u: any, tier: PackTier): string | null {
+  const c = careerOf(u); const price = PACK_PRICES[tier];
+  if (c.money < price) return `You need ${'$'}${price.toLocaleString()}.`;
+  c.money -= price; c.packs.push(tier); return null;
+}
+export function buyEquipment(u: any, id: string): string | null {
+  const c = careerOf(u), p = me(u); const e = EQUIPMENT_MAP[id];
+  if (!e) return 'Unknown item';
+  if (c.equipment.includes(id)) return 'You already own it';
+  if (c.money < e.price) return `You need ${'$'}${e.price.toLocaleString()}.`;
+  c.money -= e.price;
+  c.equipment = c.equipment.filter((x) => EQUIPMENT_MAP[x]?.slot !== e.slot);
+  c.equipment.push(id);
+  c.unlocks.push({ kind: 'equipment', id, label: e.name, year: u.year, week: u.week, age: p.age });
+  applySkills(u);
+  return null;
 }
 
 // ---------------------------------------------------------------------------

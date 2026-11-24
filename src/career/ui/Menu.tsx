@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { COUNTRIES } from '../../data/countries.js';
 import { Flag } from '../../components/Common.jsx';
-import { STYLES, STYLE_SURFACE, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier } from '../data';
+import { STYLES, STYLE_SURFACE, STYLE_CEILING, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier, SKILLS, CREATION_POINTS, CREATION_MAX_PER_SKILL } from '../data';
+import type { SkillKey } from '../types';
 import { UPGRADES, TRINKETS, TRINKET_MAP, TRINKET_COLOR, CRATES, trinketSlots } from '../legacy';
 import { upgradeCost, type Meta } from '../meta';
 import type { SlotMeta } from '../storage';
@@ -85,10 +86,14 @@ function NewCareer({ meta, busy, onCancel, onCreate }: { meta: Meta; busy: boole
   const [hand, setHand] = useState<'Right' | 'Left'>('Right');
   const [bh, setBh] = useState<'Two-handed' | 'One-handed'>('Two-handed');
   const [style, setStyle] = useState(STYLES[0]);
+  const styleName = style;
   const [age, setAge] = useState<15 | 16>(15);
+  const [alloc, setAlloc] = useState<Partial<Record<SkillKey, number>>>({});
+  const used = Object.values(alloc).reduce((a, b) => a + (b ?? 0), 0);
+  const bump = (k: SkillKey, d: number) => setAlloc((x) => { const v = Math.max(0, Math.min(CREATION_MAX_PER_SKILL, (x[k] ?? 0) + d)); if (d > 0 && used >= CREATION_POINTS) return x; return { ...x, [k]: v }; });
   const ok = first.trim() && last.trim();
   const countries = [...COUNTRIES].sort((a: any, b: any) => a.name.localeCompare(b.name));
-  return <Modal title="New career" onClose={onCancel} wide footer={<><button className="cs-secondary" onClick={onCancel}>Cancel</button><button className="cs-primary" disabled={!ok || busy} onClick={() => onCreate({ firstName: first.trim(), lastName: last.trim(), tour, country, handedness: hand, backhand: bh, style, startAge: age })}>{busy ? 'Building the world…' : 'Start career'}</button></>}>
+  return <Modal title="New career" onClose={onCancel} wide footer={<><button className="cs-secondary" onClick={onCancel}>Cancel</button><button className="cs-primary" disabled={!ok || busy} onClick={() => onCreate({ firstName: first.trim(), lastName: last.trim(), tour, country, handedness: hand, backhand: bh, style, startAge: age, alloc })}>{busy ? 'Building the world…' : 'Start career'}</button></>}>
     <div className="cs-form">
       <label>First name<input value={first} onChange={(e) => setFirst(e.target.value)} maxLength={20} autoFocus /></label>
       <label>Last name<input value={last} onChange={(e) => setLast(e.target.value)} maxLength={24} /></label>
@@ -100,6 +105,11 @@ function NewCareer({ meta, busy, onCancel, onCreate }: { meta: Meta; busy: boole
     </div>
     <h4>Playing style</h4>
     <div className="cs-styles">{STYLES.map((s) => <button key={s} className={style === s ? 'active' : ''} onClick={() => setStyle(s)}><strong>{s}</strong><span>{STYLE_DESC[s]}</span><small>Best surface: {STYLE_SURFACE[s]}</small></button>)}</div>
+    <h4>Your strengths <small className="muted">{CREATION_POINTS - used} of {CREATION_POINTS} points left · each point is +1 now and +1 potential (max {CREATION_MAX_PER_SKILL} per skill)</small></h4>
+    <div className="cs-alloc">{SKILLS.map((sk) => { const style = STYLE_CEILING[styleName]?.[sk.key] ?? 0; const v = alloc[sk.key] ?? 0; return <div key={sk.key}>
+      <span>{sk.label}{style ? <em className={style > 0 ? 'up' : 'down'}> {style > 0 ? '+' : ''}{style} style</em> : null}</span>
+      <button className="ghost" disabled={!v} onClick={() => bump(sk.key, -1)}>−</button><b>{'●'.repeat(v)}<i>{'○'.repeat(CREATION_MAX_PER_SKILL - v)}</i></b><button className="ghost" disabled={v >= CREATION_MAX_PER_SKILL || used >= CREATION_POINTS} onClick={() => bump(sk.key, 1)}>+</button>
+    </div>; })}</div>
     <PotentialOdds meta={meta} />
     <p className="muted">Your potential is rolled when the career starts. Upgrades and equipped trinkets ({meta.equipped.map((id) => TRINKET_MAP[id]?.icon).join(' ') || 'none'}) apply automatically.</p>
   </Modal>;

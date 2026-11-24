@@ -8,16 +8,22 @@ specialists, a junior circuit, Grand Slams, Masters, 500s, 250s, Challengers and
 
 ## The loop
 
-Every week you choose:
+Every week you either pick a **tournament** (it takes the whole week) or fill **three slots**, which are rest
+unless you choose otherwise: training (focus and intensity), recovery session, video study, sponsor work or a
+media day.
 
-- **Compete**: pick an event. Entry works like a real acceptance list: main draw, qualifying, wildcard or
-  not accepted, projected from the entry list of that week. ITF qualifying is open entry. Add doubles if you have a partner.
-  Your matches can be played live, set by set, with opponent scouting and head-to-heads.
-- **Train**: a focus (serve, baseline, net, return, movement, fitness, mental, or a surface block) and an
-  intensity. Harder training grows you faster but costs fatigue and raises injury risk.
-- **Rest**: recover fatigue and health.
+- Entry works like a real acceptance list: main draw, qualifying, wildcard or not accepted, projected from that
+  week's entry list. ITF qualifying is open entry. Filter events by Junior, ITF & Challenger, Tour & Slams.
+  Juniors (until 18, or until you turn pro) have their own calendar: Slams, 500s, continentals and a near-weekly
+  Junior 200 circuit with regional fields.
+- Your main-draw matches can be played live with the game-by-game match viewer, which stops after every set.
+  Every match you play (qualifying, juniors, autopilot) is recorded and can be replayed from Career → Matches.
+- Prize money buys card packs, equipment and staff (Improvement). Boost cards, such as Inspiration (+5% to all
+  skills), last until the end of your next tournament.
 
-Juniors (until 18, or until you turn pro) also play the junior calendar with its own ranking.
+Navigation: **This week** (plan and schedule), **Overview**, **Career** (overview, seasons, matches,
+tournaments, milestones & skills), **Improvement** (cards, shop, equipment, team & doubles) and **World**
+(rankings, calendar, tournaments, players, juniors, doubles, national teams, news, records, almanac).
 
 ## Systems
 

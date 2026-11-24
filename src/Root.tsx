@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { initStorage, listSlots, loadSlot, saveSlot, deleteSlot, storageAvailable, onStorageError, type SlotMeta } from './career/storage';
 import { loadMeta, saveMeta, creditCoins, buyUpgrade, openCrate, toggleEquip, type Meta } from './career/meta';
-import { createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
+import { buyPack, buyEquipment, createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
 import { migrateCareer } from './career/migrate';
 import { botDecision } from './career/bot';
 import { autoPlan } from './career/engine';
@@ -87,7 +87,10 @@ function App() {
     staff: (k, lvl) => act('Updating staff…', (x) => { const err = setStaff(x, k, lvl); if (err) setTimeout(() => setNotice(err), 30); }),
     partner: (id) => act('Updating doubles…', (x) => setPartner(x, id)),
     setPlan: (week, plan) => { const c = careerOf(u); const key = weekKeyOf(u.year, week); if (week === u.week) { if (plan) c.current = plan; } else if (plan) c.plan[key] = plan; else delete c.plan[key]; settle(u); },
+    buyPack: (t) => act('Buying…', (x) => { const err = buyPack(x, t); setTimeout(() => setNotice(err ?? 'Pack added to Cards.'), 30); }),
+    buyEquipment: (id) => act('Buying…', (x) => { const err = buyEquipment(x, id); if (err) setTimeout(() => setNotice(err), 30); }),
     nextSeason: () => act('Opening the new season…', (x) => startNextSeason(x)),
+    retireNow: () => act('Announcing your retirement…', (x) => { careerOf(x).counters.retire = 1; startNextSeason(x); }),
     exit: async () => { if (u) await persist(u); setU(null); setSlot(null); setSlots(await listSlots()); window.location.hash = ''; },
     save: () => { if (u) void persist(u); },
   };
@@ -99,11 +102,11 @@ function App() {
       try {
         const next = createCareer({ ...setup, upgrades: meta.upgrades, trinkets: meta.equipped });
         persistMeta({ ...metaRef.current, careers: metaRef.current.careers + 1 });
-        setSlot(n); setU(next); window.location.hash = '#/career';
+        setSlot(n); setU(next); window.location.hash = '#/week';
         await saveSlot(n, next, slotMeta(next)); setSlots(await listSlots());
       } finally { setBusy(false); setNotice(''); }
     }}
-    onLoad={async (n) => { setBusy(true); try { const loaded = await loadSlot(n); if (loaded) { migrateCareer(loaded); setSlot(n); setU(loaded); window.location.hash = loaded.liveEvent ? '#/event' : '#/career'; } else setNotice('That save could not be loaded.'); } finally { setBusy(false); } }}
+    onLoad={async (n) => { setBusy(true); try { const loaded = await loadSlot(n); if (loaded) { migrateCareer(loaded); setSlot(n); setU(loaded); window.location.hash = loaded.liveEvent ? '#/event' : '#/week'; } else setNotice('That save could not be loaded.'); } finally { setBusy(false); } }}
     onDelete={async (n) => { if (!window.confirm(`Delete career slot ${n}? This cannot be undone.`)) return; await deleteSlot(n); setSlots(await listSlots()); }}
     onBuy={(id) => { const m = buyUpgrade(meta, id); if (m) persistMeta(m); }}
     onCrate={async (id) => { const r = openCrate(meta, id); if (!r) return null; persistMeta(r.meta); return r.duplicate ? `${r.trinket}:dup` : r.trinket; }}

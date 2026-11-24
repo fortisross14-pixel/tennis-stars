@@ -61,6 +61,16 @@ const JUNIOR_EVENTS = [
   [42,'Pan-American Junior Cup','Mexico City','MEX','Hard','Continental',32],[46,'Junior World Finals','Barcelona','ESP','Indoor','Junior Finals',16],
 ];
 
+// Junior 200s: the everyday junior circuit, with regional fields.
+const JUNIOR_200=[
+  [4,'Traralgon Junior International','Traralgon','AUS','Hard'],[5,'Cairo Junior Cup','Cairo','EGY','Clay'],[7,'Asunción Junior Bowl','Asunción','PAR','Clay'],[9,'Bradenton Junior Open','Bradenton','USA','Hard'],
+  [10,'Villena Junior Cup','Villena','ESP','Clay'],[12,'Mumbai Junior Open','Mumbai','IND','Hard'],[13,'Beaulieu Junior Cup','Beaulieu-sur-Mer','FRA','Clay'],[15,'Santa Croce Junior Trophy','Santa Croce','ITA','Clay'],
+  [17,'Prague Junior Open','Prague','CZE','Clay'],[19,'Offenbach Junior Cup','Offenbach','GER','Clay'],[20,'Milan Junior Trophy','Milan','ITA','Clay'],[23,'Roehampton Junior Grass','Roehampton','GBR','Grass'],
+  [26,'Halle Junior Grass','Halle','GER','Grass'],[28,'Klosters Junior Open','Klosters','SUI','Clay'],[29,'College Park Junior Open','College Park','USA','Hard'],[32,'Repentigny Junior Open','Repentigny','CAN','Hard'],
+  [33,'Tashkent Junior Cup','Tashkent','UZB','Hard'],[36,'Lima Junior Bowl','Lima','PER','Clay'],[37,'Osaka Junior Open','Osaka','JPN','Hard'],[40,'Kuala Lumpur Junior Open','Kuala Lumpur','MAS','Hard'],
+  [43,'Merida Junior Cup','Mérida','MEX','Hard'],[44,'Antalya Junior Indoor','Antalya','TUR','Hard'],[47,'Eddie Herr Junior Open','Bradenton','USA','Hard'],[48,'Orange Bowl Juniors','Plantation','USA','Clay'],
+].map(([w,n,c,k,s])=>[w,n,c,k,s,'Junior 200',32]);
+
 export const LEVEL_POINTS={'Grand Slam':2000,'1000':1000,'500':500,'250':250,Finals:1500,Challenger:125,'WTA 125':125,ITF:50,Olympics:0,Team:0};
 
 function dateLabel(week){const start=(week-1)*7+1;return `Week ${week} · days ${start}-${start+6}`;}
@@ -91,7 +101,7 @@ export function buildCalendar(year){
 function levelPriority(level){return {'Grand Slam':100,Olympics:98,Finals:94,'1000':88,'500':70,'250':58,Challenger:42,'WTA 125':42,ITF:24,Team:90}[level]||10;}
 
 export function buildJuniorCalendar(year){
-  const events=[];for(const row of JUNIOR_EVENTS)for(const tour of ['ATP','WTA'])events.push({...eventRow(year,tour,row),id:`${year}-${tour}-J-${row[0]}-${slugify(row[1])}`});
+  const events=[];for(const row of [...JUNIOR_EVENTS,...JUNIOR_200])for(const tour of ['ATP','WTA'])events.push({...eventRow(year,tour,row),id:`${year}-${tour}-J-${row[0]}-${slugify(row[1])}`});
   return events;
 }
 export const surfaceClass=surface=>`surface-${String(surface).toLowerCase().replace(/\s+/g,'-')}`;

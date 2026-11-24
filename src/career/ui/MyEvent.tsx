@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import Portrait from '../../components/Portrait.jsx';
 import { Flag, SurfaceBadge } from '../../components/Common.jsx';
-import { MatchPlayer, Bracket } from '../../pages/LiveEventPage.jsx';
+import { Bracket } from '../../pages/LiveEventPage.jsx';
+import { MatchViewer, type ViewerMatch } from './MatchViewer';
 import * as S from '../../sim/season.js';
 import * as RV from '../../sim/rivalries.js';
-import { careerOf, me, myPendingSlot, canPlay } from '../engine';
+import { careerOf, me, myPendingSlot, canPlay, orientSets } from '../engine';
 import { CARD_MAP } from '../cards';
 import { ROUND_NAME } from '../data';
-import { ReportCard } from './Hub';
+import { ReportCard } from './Week';
 import { levelLabel } from './common';
 
 const { liveState } = S as any;
@@ -17,16 +18,27 @@ export function MyEvent({ u, busy, onLive, onFinish, onPlayer, onPlayCard, onBac
   u: any; busy: boolean; onLive: (mode: string, slot?: number | null) => Promise<void>; onFinish: () => void; onPlayer: (id: string) => void; onPlayCard: (uid: string) => void; onBack: () => void;
 }) {
   const c = careerOf(u), p = me(u);
-  const [watch, setWatch] = useState<{ slot: number; round: string; a: string; b: string; eventId: string } | null>(null);
-  const player = watch && <MatchPlayer universe={u} eventId={watch.eventId} slot={watch.slot} round={watch.round} a={watch.a} b={watch.b} kind="singles" busy={busy}
-    onAction={async (_e: string, _m: string, slot: number) => { await onLive('slot', slot); }}
-    onClose={() => setWatch(null)} onNext={null} onPlayer={onPlayer} />;
+  const [watch, setWatch] = useState<{ round: string; eventId: string; oppId: string; slot: number } | null>(null);
+  const flip = (sc: string) => sc.split(' ').map((x) => x.split('-').reverse().join('-')).join(' ');
+  const findMatch = (eventId: string, round: string): ViewerMatch | null => {
+    const st0 = liveState(u, eventId);
+    const ed = (u.tournamentEditions || []).find((e: any) => e.id === eventId);
+    const list = st0?.matches ?? ed?.matches ?? [];
+    const m = list.find((x: any) => x.round === round && (x.playerA === p.id || x.playerB === p.id));
+    if (!m) return null;
+    const ev = u.calendar.find((e: any) => e.id === eventId);
+    const won = m.winnerId === p.id;
+    return { sets: orientSets(m, p.id), won, score: won ? m.score : flip(m.score), event: ev?.name ?? '', round, surface: ev?.surface ?? '', minutes: m.durationMinutes, tags: m.tags };
+  };
+  const player = watch && <MatchViewer match={findMatch(watch.eventId, watch.round)} me={p} opp={[...u.players[c.tour], ...u.juniors[c.tour]].find((x: any) => x.id === watch.oppId)} pending busy={busy}
+    onCompute={async () => { if (!findMatch(watch.eventId, watch.round)) await onLive('slot', watch.slot); }} onClose={() => setWatch(null)} />;
   if (!u.liveEvent || !c.live) {
     return <div className="cs-page"><section className="cs-panel"><h2>Tournament complete</h2><p className="muted">The week has closed.</p><button className="cs-primary" onClick={onBack}>Back to your week</button></section>{c.lastReport && <ReportCard r={c.lastReport} />}{player}</div>;
   }
   const st = liveState(u, c.live.eventId);
   const event = u.calendar.find((e: any) => e.id === c.live!.eventId);
-  const alive = st && !st.done && st.alive.includes(p.id);
+  // out as soon as you lose, even while the rest of the round is still being played
+  const alive = st && !st.done && st.alive.includes(p.id) && !st.exitRound?.[p.id];
   const round = st?.rounds?.[st.roundIndex];
   const mySlot = st ? myPendingSlot(st, p.id) : null;
   const oppId = mySlot != null ? st.alive[mySlot * 2] === p.id ? st.alive[mySlot * 2 + 1] : st.alive[mySlot * 2] : null;
@@ -56,7 +68,7 @@ export function MyEvent({ u, busy, onLive, onFinish, onPlayer, onPlayCard, onBac
         </div>
         <div className="cs-actions">
           {othersPending > 0 && <button className="cs-secondary" disabled={busy} onClick={() => onLive('to-my-match')}>Play the other matches first ({othersPending})</button>}
-          <button className="cs-primary" disabled={busy} onClick={() => setWatch({ slot: mySlot, round, a: p.id, b: opp.id, eventId: c.live!.eventId })}>▶ Play your match</button>
+          <button className="cs-primary" disabled={busy} onClick={() => setWatch({ slot: mySlot, round, oppId: opp.id, eventId: c.live!.eventId })}>▶ Play your match</button>
           <button className="cs-secondary" disabled={busy} onClick={() => onLive('slot', mySlot)}>Simulate it</button>
         </div>
         {boosts.length > 0 && c.cardPlays > 0 && <div className="cs-quickcards"><small>Play a card before the match ({c.cardPlays} plays):</small>{boosts.map((h) => { const d = CARD_MAP[h.id]; const err = canPlay(u, h.uid); return <button key={h.uid} disabled={!!err || busy} title={err ?? d.desc} onClick={() => onPlayCard(h.uid)}>{d.icon} {d.name}</button>; })}</div>}

@@ -49,10 +49,18 @@ export function Modal({ title, onClose, children, wide, footer }: { title: React
   </div>;
 }
 
-export const LEVEL_SHORT: Record<string, string> = { 'Grand Slam': 'Slam', '1000': 'M1000', '500': 'ATP 500', '250': 'ATP 250', Challenger: 'Challenger', 'WTA 125': 'WTA 125', ITF: 'ITF', Finals: 'Finals', Olympics: 'Olympics', 'Junior Slam': 'Junior Slam', 'Junior 500': 'Junior 500', 'Junior Finals': 'Junior Finals', Continental: 'Junior continental' };
+export const LEVEL_SHORT: Record<string, string> = { 'Grand Slam': 'Slam', '1000': 'M1000', '500': 'ATP 500', '250': 'ATP 250', Challenger: 'Challenger', 'WTA 125': 'WTA 125', ITF: 'ITF', Finals: 'Finals', Olympics: 'Olympics', 'Junior Slam': 'Junior Slam', 'Junior 500': 'Junior 500', 'Junior 200': 'Junior 200', 'Junior Finals': 'Junior Finals', Continental: 'Junior continental' };
 export function levelLabel(level: string, tour: string) {
   if (tour === 'WTA' && (level === '500' || level === '250' || level === '1000')) return level === '1000' ? 'WTA 1000' : `WTA ${level}`;
   return LEVEL_SHORT[level] ?? level;
 }
 
 export const STATUS_LABEL: Record<string, string> = { direct: 'Main draw', qualifying: 'Qualifying', wildcard: 'Wildcard', alternate: 'Alternate', out: 'Not accepted', ineligible: 'Not eligible' };
+
+/** Round label that reads well for qualifying rounds too. */
+export function roundLabel(round: string, qualifying?: boolean) {
+  const names: Record<string, string> = { R128: 'First round', R64: 'Round of 64', R32: 'Round of 32', R16: 'Round of 16', QF: 'Quarterfinal', SF: 'Semifinal', F: 'Final', W: 'Champion', Q: 'Qualifying' };
+  if (/^Q\d$/.test(round)) return `Qualifying R${round.slice(1)}`;
+  if (round === 'Q' || qualifying) return names[round] && round !== 'Q' ? `Qualifying · ${names[round]}` : 'Qualifying';
+  return names[round] ?? round;
+}

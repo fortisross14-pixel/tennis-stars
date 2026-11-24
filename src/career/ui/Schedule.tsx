@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { SurfaceBadge } from '../../components/Common.jsx';
-import { careerOf, me, projectWeek, weekKeyOf, levelRank } from '../engine';
+import { careerOf, me, projectWeek, weekKeyOf, levelRank, asSlots, restWeek } from '../engine';
 import type { WeekPlan } from '../types';
 import { levelLabel, STATUS_LABEL } from './common';
 
@@ -19,7 +19,7 @@ export function Schedule({ u, onSetPlan }: { u: any; onSetPlan: (week: number, p
         const shown = options.filter((o) => o.status !== 'ineligible').slice(0, 6);
         return <article key={week} className={week === u.week ? 'now' : ''}>
           <header><strong>Week {week}</strong>{week === u.week && <em>this week</em>}
-            <span>{plan ? plan.kind === 'train' ? '🏋 Train' : plan.kind === 'rest' ? '🛌 Rest' : '🎾 Play' : <span className="muted">default: train</span>}</span>
+            <span>{plan ? (plan.kind === 'compete' || plan.kind === 'junior') ? '🎾 Play' : (asSlots(plan) ?? []).every((x) => x.kind === 'rest') ? '🛌 Rest' : '🏋 Slots' : <span className="muted">default: rest</span>}</span>
             {plan && week !== u.week && <button className="ghost" onClick={() => onSetPlan(week, null)}>clear</button>}
           </header>
           <ul>{shown.map((o) => <li key={o.event.id} className={sel === o.event.id ? 'selected' : ''}>
@@ -27,7 +27,7 @@ export function Schedule({ u, onSetPlan }: { u: any; onSetPlan: (week: number, p
               <span className="cs-level">{levelLabel(o.event.level, c.tour)}</span><b>{o.event.name}</b><SurfaceBadge surface={o.event.surface} /><span className={`cs-entry st-${o.status}`}>{STATUS_LABEL[o.status]}</span>
             </button></li>)}
             {!shown.length && <li className="muted">No events.</li>}
-            {week !== u.week && <li className="cs-sched-alt"><button onClick={() => onSetPlan(week, { kind: 'rest' })}>Plan rest</button></li>}
+            {week !== u.week && <li className="cs-sched-alt"><button onClick={() => onSetPlan(week, restWeek())}>Plan a week off</button></li>}
           </ul>
         </article>;
       })}</div>

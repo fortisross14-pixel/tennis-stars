@@ -6,7 +6,8 @@ export interface CardDef {
   skills?: Partial<Skills>;          // drill: permanent; boost: for the week
   all?: number;                      // +n to every skill (drill/boost/potential)
   edge?: number;                     // boost: flat match edge
-  weeks?: number;                    // boost duration
+  pct?: number;                      // boost: +x% to every skill
+  weeks?: number;                    // boost: number of tournaments it lasts
   ceiling?: Partial<Skills>;         // potential
   ceilingAll?: number;
   ceilingRandom?: number;
@@ -32,14 +33,16 @@ for (const [id, name, keys] of COMBOS) {
 CARDS.push({ id: 'dr-all-2', name: 'Perfect Pre-Season', kind: 'drill', rarity: 'legendary', icon: '👑', desc: '+2 to every skill.', all: 2 });
 
 CARDS.push(
-  { id: 'bo-ace', name: 'Ace Machine', kind: 'boost', rarity: 'uncommon', icon: '💥', desc: '+8 Serve this week.', skills: { serve: 8 }, weeks: 1 },
-  { id: 'bo-fh', name: 'Forehand on Fire', kind: 'boost', rarity: 'uncommon', icon: '🔥', desc: '+8 Forehand this week.', skills: { forehand: 8 }, weeks: 1 },
-  { id: 'bo-wall', name: 'The Wall', kind: 'boost', rarity: 'uncommon', icon: '🧱', desc: '+6 Return and Footwork this week.', skills: { return: 6, footwork: 6 }, weeks: 1 },
-  { id: 'bo-clutch', name: 'Ice in the Veins', kind: 'boost', rarity: 'rare', icon: '🧊', desc: '+9 Mentality and +3 edge this week.', skills: { mentality: 9 }, edge: 3, weeks: 1 },
-  { id: 'bo-legs', name: 'Second Wind', kind: 'boost', rarity: 'common', icon: '🫁', desc: '+8 Endurance this week and −15 fatigue.', skills: { endurance: 8 }, fatigue: -15, weeks: 1 },
-  { id: 'bo-net', name: 'Soft Hands', kind: 'boost', rarity: 'common', icon: '🤲', desc: '+8 Volley this week.', skills: { volley: 8 }, weeks: 1 },
-  { id: 'bo-zone', name: 'In the Zone', kind: 'boost', rarity: 'epic', icon: '🌀', desc: '+4 to every skill and +3 edge for 2 weeks.', all: 4, edge: 3, weeks: 2 },
-  { id: 'bo-god', name: 'Untouchable', kind: 'boost', rarity: 'legendary', icon: '⚜', desc: '+7 to every skill and +5 edge for 2 weeks.', all: 7, edge: 5, weeks: 2 },
+  { id: 'bo-ace', name: 'Ace Machine', kind: 'boost', rarity: 'uncommon', icon: '💥', desc: '+8 Serve for your next tournament.', skills: { serve: 8 }, weeks: 1 },
+  { id: 'bo-fh', name: 'Forehand on Fire', kind: 'boost', rarity: 'uncommon', icon: '🔥', desc: '+8 Forehand for your next tournament.', skills: { forehand: 8 }, weeks: 1 },
+  { id: 'bo-wall', name: 'The Wall', kind: 'boost', rarity: 'uncommon', icon: '🧱', desc: '+6 Return and Footwork for your next tournament.', skills: { return: 6, footwork: 6 }, weeks: 1 },
+  { id: 'bo-clutch', name: 'Ice in the Veins', kind: 'boost', rarity: 'rare', icon: '🧊', desc: '+9 Mentality and +3 edge for your next tournament.', skills: { mentality: 9 }, edge: 3, weeks: 1 },
+  { id: 'bo-legs', name: 'Second Wind', kind: 'boost', rarity: 'common', icon: '🫁', desc: '+8 Endurance for your next tournament and −15 fatigue.', skills: { endurance: 8 }, fatigue: -15, weeks: 1 },
+  { id: 'bo-net', name: 'Soft Hands', kind: 'boost', rarity: 'common', icon: '🤲', desc: '+8 Volley for your next tournament.', skills: { volley: 8 }, weeks: 1 },
+  { id: 'bo-insp', name: 'Inspiration', kind: 'boost', rarity: 'uncommon', icon: '💡', desc: '+5% to every skill for your next tournament.', pct: 0.05, weeks: 1 },
+  { id: 'bo-belief', name: 'Total Belief', kind: 'boost', rarity: 'rare', icon: '🌅', desc: '+8% to every skill and +2 edge for your next tournament.', pct: 0.08, edge: 2, weeks: 1 },
+  { id: 'bo-zone', name: 'In the Zone', kind: 'boost', rarity: 'epic', icon: '🌀', desc: '+4 to every skill and +3 edge for your next 2 tournaments.', all: 4, edge: 3, weeks: 2 },
+  { id: 'bo-god', name: 'Untouchable', kind: 'boost', rarity: 'legendary', icon: '⚜', desc: '+7 to every skill and +5 edge for your next 2 tournaments.', all: 7, edge: 5, weeks: 2 },
 );
 CARDS.push(
   { id: 're-ice', name: 'Ice Bath', kind: 'recovery', rarity: 'common', icon: '🧊', desc: '−20 fatigue.', fatigue: -20 },

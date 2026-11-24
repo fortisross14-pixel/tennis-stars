@@ -10,15 +10,33 @@ export type PackTier = 'bronze' | 'silver' | 'gold' | 'elite';
 export type Intensity = 'light' | 'normal' | 'hard' | 'brutal';
 export type StaffKey = 'coach' | 'physio' | 'fitness' | 'mental';
 
+/** One third of a week without a tournament. */
+export type SlotPlan =
+  | { kind: 'rest' }
+  | { kind: 'train'; focus: string; intensity: Intensity }
+  | { kind: 'sponsor' } | { kind: 'media' } | { kind: 'recovery' } | { kind: 'video' };
+
 export type WeekPlan =
   | { kind: 'compete'; eventId: string; doubles?: boolean }
   | { kind: 'junior'; eventId: string }
+  | { kind: 'slots'; slots: SlotPlan[] }
+  // older saves (before slots): a whole week of one thing
   | { kind: 'train'; focus: string; intensity: Intensity }
   | { kind: 'rest' };
 
+/** Every match you play, oriented so that 'A' is you. */
+export interface MatchRecord {
+  id: string; year: number; week: number; event: string; level: string; surface: string; round: string;
+  oppId: string; oppName: string; oppCountry: string; oppRank: number; myRank: number;
+  won: boolean; score: string; sets: { gameWinners: string[]; servers: string[] }[];
+  tags: string[]; minutes: number; qualifying?: boolean; junior?: boolean;
+}
+export interface TournamentRecord { year: number; week: number; age: number; event: string; level: string; surface: string; entry: string; result: string; prize: number; doubles?: string | null; eventId: string }
+export interface UnlockRecord { kind: 'special' | 'milestone' | 'equipment'; id: string; label: string; year: number; week: number; age: number }
+
 export interface CardInstance { uid: string; id: string }
 
-export interface ActiveBoost { cardId: string; name: string; skills: Partial<Skills>; edge: number; weeks: number }
+export interface ActiveBoost { cardId: string; name: string; skills: Partial<Skills>; edge: number; weeks: number; pct?: number }
 
 export interface DecisionOption {
   id: string; label: string; desc: string;
@@ -36,7 +54,7 @@ export interface Effects {
 
 export interface MatchLine {
   eventName: string; level: string; round: string; opponent: string; opponentRank: number;
-  won: boolean; score: string; qualifying?: boolean; doubles?: boolean; junior?: boolean;
+  won: boolean; score: string; qualifying?: boolean; doubles?: boolean; junior?: boolean; matchId?: string;
 }
 
 export interface WeekReport {
@@ -108,4 +126,10 @@ export interface Career {
   legacy: { grade: string; score: number; coins: number } | null;
   seed: number;
   uid: number;
+  matchLog: MatchRecord[];
+  tournamentLog: TournamentRecord[];
+  unlocks: UnlockRecord[];
+  skillLog: { year: number; age: number; skills: Skills; ceiling: Skills }[];
+  equipment: string[];
+  watched: Record<string, boolean>;
 }
