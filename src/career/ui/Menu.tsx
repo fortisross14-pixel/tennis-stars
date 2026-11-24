@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { COUNTRIES } from '../../data/countries.js';
 import { Flag } from '../../components/Common.jsx';
-import { STYLES, STYLE_SURFACE } from '../data';
+import { STYLES, STYLE_SURFACE, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier } from '../data';
 import { UPGRADES, TRINKETS, TRINKET_MAP, TRINKET_COLOR, CRATES, trinketSlots } from '../legacy';
 import { upgradeCost, type Meta } from '../meta';
 import type { SlotMeta } from '../storage';
@@ -100,6 +100,22 @@ function NewCareer({ meta, busy, onCancel, onCreate }: { meta: Meta; busy: boole
     </div>
     <h4>Playing style</h4>
     <div className="cs-styles">{STYLES.map((s) => <button key={s} className={style === s ? 'active' : ''} onClick={() => setStyle(s)}><strong>{s}</strong><span>{STYLE_DESC[s]}</span><small>Best surface: {STYLE_SURFACE[s]}</small></button>)}</div>
+    <PotentialOdds meta={meta} />
     <p className="muted">Your potential is rolled when the career starts. Upgrades and equipped trinkets ({meta.equipped.map((id) => TRINKET_MAP[id]?.icon).join(' ') || 'none'}) apply automatically.</p>
   </Modal>;
+}
+
+function PotentialOdds({ meta }: { meta: Meta }) {
+  const max = maxPotentialTier(meta.upgrades.talent ?? 0);
+  const floor = meta.upgrades.scouting ?? 0;
+  const w = POTENTIAL_WEIGHTS.slice(0, max + 1);
+  const odds = w.map((x, i) => (i < floor ? 0 : x));
+  odds[floor] += w.slice(0, floor).reduce((a, b) => a + b, 0);
+  const total = odds.reduce((a, b) => a + b, 0);
+  return <div className="cs-odds">
+    <h4>Potential roll</h4>
+    <div>{POTENTIAL_TIERS.map((t, i) => <span key={t.name} className={i > max ? 'locked' : ''}>
+      <b>{t.name}</b>{i > max ? <small>🔒 {i === 3 ? 'Talent Pool I' : 'Talent Pool II'}</small> : <small>{(odds[i] / total * 100).toFixed(i === 5 ? 1 : 0)}%</small>}
+    </span>)}</div>
+  </div>;
 }

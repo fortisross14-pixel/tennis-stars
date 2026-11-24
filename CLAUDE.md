@@ -8,7 +8,9 @@
 - New fields on `Career` (`src/career/types.ts`) need a default in `DEFAULTS` in `src/career/migrate.ts`.
   New fields on Chronicle players or the universe go in `src/sim/migrations.js`.
 - Don't change overall balance unless asked; check with `npm run sim [n]` or `scripts/sim-par.sh 3`
-  (4 processes; `--profile=fresh|run5|run10`). Current fresh-profile targets: median career-high ≈ No. 100,
-  about half of careers reach the top 100, Slam titles mostly from Legend-tier potential.
+  (4 processes; `--profile=fresh|run5|run10`, `--tier=Rare|Epic|Legend`, `--smart` for a careful player).
+  Starts roll Common/Uncommon/Rare; Epic and Legend are unlocked with the Talent Pool upgrade.
+  Targets: Rare played carelessly peaks around No. 10 with 0–2 Masters; Rare played well reaches the top 5
+  with several Masters and sometimes a Slam; Epic is a top-10 Masters winner; Legend wins multiple Slams.
 - Storage goes through `src/career/storage.ts` (IndexedDB). Never call `localStorage` directly:
   the github.io origin is shared with many other games and its localStorage is usually full.

@@ -227,3 +227,6 @@
 .cs-shell .main-nav{overflow-x:auto;flex-wrap:nowrap}
 .cs-shell .main-nav button{white-space:nowrap}
 @media (max-width:640px){.cs-shell .content-shell{padding:12px}.cs-top-stats{order:3;width:100%}}
+.cs-odds{margin:6px 0 10px}.cs-odds h4{margin:0 0 6px}.cs-odds>div{display:flex;flex-wrap:wrap;gap:6px}
+.cs-odds span{border:1px solid var(--line);background:#fff;border-radius:4px;padding:6px 10px;font-size:12px;min-width:92px}
+.cs-odds span b{display:block}.cs-odds span small{color:var(--muted)}.cs-odds span.locked{opacity:.55;background:var(--cream)}

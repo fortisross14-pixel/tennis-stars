@@ -19,7 +19,7 @@ export function botDecision(u: any) {
   resolveDecision(u, safe.id);
 }
 
-export function botCards(u: any, compete: boolean) {
+export function botCards(u: any, compete: boolean, careless = false) {
   const c = careerOf(u), p = me(u);
   for (let i = c.packs.length - 1; i >= 0; i -= 1) openPack(u, i);
   for (const t of ['bronze', 'silver', 'gold'] as const) while (mergePacks(u, t)) { /* merge */ }
@@ -35,29 +35,31 @@ export function botCards(u: any, compete: boolean) {
   for (const h of order) {
     if (c.cardPlays <= 0) break;
     if (score(h.id) <= 0) continue;
+    // a careless player forgets half their cards
+    if (careless && (c.counters.weeks ?? 0) % 2 === 1) break;
     if (!canPlay(u, h.uid)) playCard(u, h.uid);
   }
 }
 
-export function botStaff(u: any) {
+export function botStaff(u: any, smart = false) {
   const c = careerOf(u);
   for (const k of ['coach', 'physio', 'fitness', 'mental'] as StaffKey[]) {
-    const next = c.staff[k] + 1; if (next > 3) continue;
+    const next = c.staff[k] + 1; if (next > (smart ? 3 : 1)) continue;
     const add = STAFF[k].levels[next].weekly - STAFF[k].levels[c.staff[k]].weekly;
-    if (c.money > (weeklyStaffCost(c) + add) * 40) setStaff(u, k, next);
+    if (c.money > (weeklyStaffCost(c) + add) * (smart ? 22 : 40)) setStaff(u, k, next);
   }
 }
 
 /** Play one week with the autopilot. Returns false when the career is over. */
-export function botWeek(u: any, opts: { aggressive?: boolean } = {}): boolean {
+export function botWeek(u: any, opts: { aggressive?: boolean; smart?: boolean } = {}): boolean {
   const c = careerOf(u);
   if (c.retired) return false;
   if (c.decision) botDecision(u);
   if (u.seasonEnded) { if (c.decision) botDecision(u); startNextSeason(u); return !c.retired; }
   const plan = autoPlan(u, opts);
   c.current = plan;
-  botCards(u, plan.kind === 'compete' || plan.kind === 'junior');
-  if (u.week % 13 === 0) botStaff(u);
+  botCards(u, plan.kind === 'compete' || plan.kind === 'junior', !opts.smart);
+  if (u.week % (opts.smart ? 4 : 13) === 0) botStaff(u, opts.smart);
   playWeek(u, { live: false });
   return !c.retired;
 }

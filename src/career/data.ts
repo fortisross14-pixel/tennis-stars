@@ -86,14 +86,18 @@ export function travelCost(home: string, host: string): number {
 export const LIVING_COST = 450;
 
 export const POTENTIAL_TIERS: { name: string; min: number; max: number; stars: number }[] = [
-  { name: 'Common', min: 57, max: 65, stars: 1 },
-  { name: 'Uncommon', min: 64, max: 72, stars: 2 },
-  { name: 'Rare', min: 71, max: 79, stars: 3 },
-  { name: 'Epic', min: 78, max: 85, stars: 4 },
-  { name: 'Legend', min: 84, max: 90, stars: 5 },
-  { name: 'Generational', min: 90, max: 95, stars: 5 },
+  { name: 'Common', min: 60, max: 68, stars: 1 },
+  { name: 'Uncommon', min: 67, max: 75, stars: 2 },
+  { name: 'Rare', min: 76, max: 83, stars: 3 },
+  { name: 'Epic', min: 83, max: 89, stars: 4 },
+  { name: 'Legend', min: 87, max: 92, stars: 5 },
+  { name: 'Generational', min: 91, max: 96, stars: 5 },
 ];
-export const POTENTIAL_ODDS = [0.22, 0.38, 0.27, 0.095, 0.03, 0.005];
+// Relative odds per tier. Epic and Legend are unlocked in the legacy shop (upgrade "Talent Pool");
+// Generational can only appear once Legend is unlocked.
+export const POTENTIAL_WEIGHTS = [30, 42, 28, 11, 4, 0.6];
+/** Highest tier index a career can roll: 2 = Rare (start), 3 = Epic, 5 = Legend and Generational. */
+export function maxPotentialTier(talent: number) { return talent >= 2 ? 5 : talent >= 1 ? 3 : 2; }
 
 export const STYLES = ['Aggressive baseline', 'Defensive baseline', 'Counterpuncher', 'All-court', 'Serve-and-volley', 'Big server', 'Clay grinder', 'Precision attacker'];
 export const STYLE_CEILING: Record<string, Partial<Record<SkillKey, number>>> = {

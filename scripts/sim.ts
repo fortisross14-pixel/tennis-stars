@@ -9,6 +9,8 @@ const n = Number(args.find((a) => /^\d+$/.test(a)) ?? 12);
 const profile = (args.find((a) => a.startsWith('--profile='))?.split('=')[1]) ?? 'fresh';
 const verbose = args.includes('--verbose');
 const bothTours = args.includes('--both-tours');
+const smart = args.includes('--smart');
+const forceTier = args.find((a) => a.startsWith('--tier='))?.split('=')[1];
 const offset = Number(args.find((a) => a.startsWith('--offset='))?.split('=')[1] ?? 0);
 const PROFILES: Record<string, { upgrades: Record<string, number>; trinkets: string[] }> = {
   fresh: { upgrades: {}, trinkets: [] },
@@ -20,9 +22,9 @@ const prof = PROFILES[profile] ?? PROFILES.fresh;
 const rows: any[] = [];
 const t0 = Date.now();
 for (let i = offset; i < offset + n; i += 1) {
-  const u = createCareer({ firstName: 'Sim', lastName: `Player${i}`, tour: i % 2 ? 'WTA' : 'ATP', country: ['ESP', 'USA', 'FRA', 'ITA', 'AUS', 'ARG', 'GBR', 'JPN'][i % 8], handedness: 'Right', backhand: 'Two-handed', style: STYLES[i % STYLES.length], startAge: 15, trinkets: prof.trinkets, upgrades: prof.upgrades, seed: 1000 + i * 7919, soloTour: !bothTours });
+  const u = createCareer({ firstName: 'Sim', lastName: `Player${i}`, tour: i % 2 ? 'WTA' : 'ATP', country: ['ESP', 'USA', 'FRA', 'ITA', 'AUS', 'ARG', 'GBR', 'JPN'][i % 8], handedness: 'Right', backhand: 'Two-handed', style: STYLES[i % STYLES.length], startAge: 15, trinkets: prof.trinkets, upgrades: prof.upgrades, seed: 1000 + i * 7919, soloTour: !bothTours, forceTier });
   let guard = 0;
-  while (botWeek(u) && guard++ < 52 * 30) {
+  while (botWeek(u, { smart }) && guard++ < 52 * 30) {
     if (verbose && u.week === 1 && !u.seasonEnded) { const p = me(u), c = careerOf(u); const s = c.seasons.at(-1); if (s) console.log(`  ${s.year} age ${s.age} rank ${s.rankEnd} (best ${s.bestRank}) ovr ${s.rating} W-L ${s.wins}-${s.losses} titles ${s.titles} $${Math.round(c.money / 1000)}K staff ${Object.values(c.staff).join('')}${s.juniorBest ? ` jr ${s.juniorBest}` : ''}`); }
   }
   const p = me(u), c = careerOf(u), k = p.career;

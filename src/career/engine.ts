@@ -17,7 +17,7 @@ const { projectCareerEntries } = T as any;
 const { simulateMatch } = MM as any;
 import {
   SKILL_KEYS, FOCUS_MAP, INTENSITY, STAFF, COACH_GROWTH, PRIZE, DOUBLES_PRIZE_SHARE, ROUND_ORDER, ROUND_NAME,
-  travelCost, LIVING_COST, POTENTIAL_TIERS, POTENTIAL_ODDS, STYLE_CEILING, STYLE_SURFACE, SPECIAL_MAP, PACKS, SKILL_LABEL,
+  travelCost, LIVING_COST, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier, STYLE_CEILING, STYLE_SURFACE, SPECIAL_MAP, PACKS, SKILL_LABEL,
 } from './data';
 import { CARD_LIST, CARD_MAP, CARD_SELL } from './cards';
 import { MILESTONE_MAP, TITLE_COINS, TRINKET_MAP } from './legacy';
@@ -30,7 +30,7 @@ export const START_YEAR = 2026;
 export interface CareerSetup {
   firstName: string; lastName: string; tour: Tour; country: string;
   handedness: 'Right' | 'Left'; backhand: 'Two-handed' | 'One-handed'; style: string; startAge: 15 | 16;
-  trinkets: string[]; upgrades: Record<string, number>; seed?: number; soloTour?: boolean;
+  trinkets: string[]; upgrades: Record<string, number>; seed?: number; soloTour?: boolean; forceTier?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ export function juniorRank(u: any): number | null {
 
 export function maxPlays(c: Career) { return 3 + c.fx.plays; }
 /** Potential cards can lift a career only so far. */
-export const POTENTIAL_CARD_CAP = 3;
+export const POTENTIAL_CARD_CAP = 5;
 export function handLimit(c: Career) { return 14 + c.fx.handBonus; }
 export function weeklyStaffCost(c: Career) { return (Object.keys(c.staff) as StaffKey[]).reduce((s, k) => s + STAFF[k].levels[c.staff[k]].weekly, 0); }
 export function sponsorIncome(p: any) {
@@ -137,10 +137,14 @@ export function createCareer(setup: CareerSetup) {
   const trinketFx = setup.trinkets.map((id) => TRINKET_MAP[id]?.fx).filter(Boolean) as any[];
 
   // potential tier
-  let roll = rng.next(), tier = 0;
-  for (let i = 0, acc = 0; i < POTENTIAL_ODDS.length; i += 1) { acc += POTENTIAL_ODDS[i]; if (roll <= acc) { tier = i; break; } }
+  const maxTier = maxPotentialTier(up.talent ?? 0);
+  const weights = POTENTIAL_WEIGHTS.slice(0, maxTier + 1);
+  let roll = rng.next() * weights.reduce((a, b) => a + b, 0), tier = 0;
+  for (let i = 0; i < weights.length; i += 1) { roll -= weights[i]; if (roll <= 0) { tier = i; break; } }
   tier = Math.max(tier, up.scouting ?? 0);
-  tier = Math.min(POTENTIAL_TIERS.length - 1, tier + trinketFx.reduce((s, t) => s + (t.tier ?? 0), 0));
+  // trinkets lift the roll, but never past what the talent pool has unlocked (Generational is roll-only)
+  tier = Math.max(tier, Math.min(Math.min(maxTier, 4), tier + trinketFx.reduce((s, t) => s + (t.tier ?? 0), 0)));
+  if (setup.forceTier) tier = Math.max(0, POTENTIAL_TIERS.findIndex((t) => t.name === setup.forceTier));
   const T = POTENTIAL_TIERS[tier];
   const avg = rng.float(T.min, T.max);
   const ceilBonus = trinketFx.reduce((s, t) => s + (t.ceiling ?? 0), 0) + ([0, 1, 2, 4][up.gifted ?? 0] ?? 0);
@@ -884,18 +888,27 @@ export function setPartner(u: any, id: string | null) {
 // ---------------------------------------------------------------------------
 // Autopilot (used by "simulate weeks" and the balance harness)
 // ---------------------------------------------------------------------------
-export function autoPlan(u: any, opts: { aggressive?: boolean } = {}): WeekPlan {
+export function autoPlan(u: any, opts: { aggressive?: boolean; smart?: boolean } = {}): WeekPlan {
   const c = careerOf(u), p = me(u);
   if (p.injury?.weeksRemaining > 0) return { kind: 'rest' };
   if (p.fatigue >= 62) return { kind: 'rest' };
   const opts2 = projectWeek(u).filter((o) => ['direct', 'qualifying', 'wildcard'].includes(o.status));
   const recent = c.reports.slice(0, 3).filter((r) => r.plan.kind === 'compete' || r.plan.kind === 'junior').length;
-  const wantPlay = p.fatigue < 48 && recent < 3;
+  const wantPlay = opts.smart ? p.fatigue < 40 && recent < 3 : p.fatigue < 48 && recent < 3;
   if (wantPlay && opts2.length) {
     const score = (o: EventOption) => levelRank(o.event.level) + (o.status === 'direct' ? 30 : o.status === 'wildcard' ? 25 : 0) + (o.event.surface === p.preferredSurface ? 6 : 0) - o.travel / 600 - (o.event.level === 'Junior Slam' ? -30 : 0);
     const best = [...opts2].sort((a, b) => score(b) - score(a))[0];
     if (best.event.level.startsWith('Junior') || best.event.level === 'Continental') return { kind: 'junior', eventId: best.event.id };
     return { kind: 'compete', eventId: best.event.id, doubles: best.doublesOk };
+  }
+  if (opts.smart) {
+    // a thoughtful player trains whatever has the most room to grow
+    let best = 'balanced', bestScore = -1;
+    for (const f of Object.values(FOCUS_MAP)) {
+      const sc = SKILL_KEYS.reduce((sum, k) => sum + (f.weights[k] ?? 0) * Math.max(0, c.ceiling[k] - c.base[k]), 0);
+      if (sc > bestScore) { bestScore = sc; best = f.id; }
+    }
+    return { kind: 'train', focus: best, intensity: p.fatigue < 25 ? 'hard' : p.fatigue < 45 ? 'normal' : 'light' };
   }
   return { kind: 'train', focus: c.defaultTrain.focus, intensity: p.fatigue < 20 ? (opts.aggressive ? 'hard' : 'normal') : p.fatigue < 40 ? 'normal' : 'light' };
 }

@@ -6,6 +6,7 @@ import type { PackTier } from './types';
 
 export interface UpgradeDef { id: string; name: string; icon: string; costs: number[]; levels: string[] }
 export const UPGRADES: UpgradeDef[] = [
+  { id: 'talent', name: 'Talent Pool', icon: '💎', costs: [1500, 4500], levels: ['Epic potential can be rolled', 'Legend potential can be rolled (and, very rarely, Generational)'] },
   { id: 'slots', name: 'Trinket Slots', icon: '🎒', costs: [500, 1800], levels: ['2 trinket slots per career', '3 trinket slots per career'] },
   { id: 'academy', name: 'Better Academy', icon: '🏫', costs: [300, 900, 2200], levels: ['+2 to every skill at the start', '+4 to every skill at the start', '+6 to every skill at the start'] },
   { id: 'gifted', name: 'Gifted', icon: '✦', costs: [600, 1700, 3800], levels: ['+1 potential in every skill', '+2 potential in every skill', '+4 potential in every skill'] },
@@ -41,11 +42,11 @@ export const TRINKETS: TrinketDef[] = [
   { id: 'strings', name: 'Hybrid Strings', icon: '🧵', rarity: 'rare', desc: '+3 potential in every skill.', fx: { ceiling: 3 } },
   { id: 'hourglass', name: 'Hourglass', icon: '⌛', rarity: 'rare', desc: '+1 max card play, +2 potential.', fx: { plays: 1, ceiling: 2 } },
   { id: 'cap', name: 'Lucky Cap', icon: '🧢', rarity: 'rare', desc: 'Much better pack odds, +2 potential.', fx: { luck: 1, ceiling: 2 } },
-  { id: 'clover', name: 'Four-leaf Clover', icon: '🍀', rarity: 'epic', desc: 'Potential at least one tier higher, +2 potential.', fx: { tier: 1, ceiling: 2 } },
+  { id: 'clover', name: 'Four-leaf Clover', icon: '🍀', rarity: 'epic', desc: 'Potential one tier higher (up to the best tier you have unlocked), +2 potential.', fx: { tier: 1, ceiling: 2 } },
   { id: 'racquet', name: "Champion's Racquet", icon: '🏸', rarity: 'epic', desc: '+5 potential, +3 to every skill at the start.', fx: { ceiling: 5, start: 3 } },
   { id: 'midas', name: 'Midas Touch', icon: '🪙', rarity: 'epic', desc: '+60% legacy coins, +3 potential.', fx: { coinMult: 0.6, ceiling: 3 } },
   { id: 'steel', name: 'Indestructible', icon: '🦾', rarity: 'epic', desc: 'No injuries for 3 seasons, then −30%. +3 potential.', fx: { noInjurySeasons: 3, injury: 0.3, ceiling: 3 } },
-  { id: 'crown', name: 'The Crown', icon: '👑', rarity: 'legendary', desc: 'Potential two tiers higher and an Elite pack.', fx: { tier: 2, packs: ['elite'] } },
+  { id: 'crown', name: 'The Crown', icon: '👑', rarity: 'legendary', desc: 'Potential two tiers higher (up to the best tier you have unlocked) and an Elite pack.', fx: { tier: 2, packs: ['elite'] } },
   { id: 'eternal', name: 'Eternal Prime', icon: '♾', rarity: 'legendary', desc: 'Decline 3 years later, +6 potential, injury risk −25%.', fx: { prime: 3, ceiling: 6, injury: 0.25 } },
   { id: 'aura', name: 'Aura', icon: '✨', rarity: 'legendary', desc: '+8 potential and the Big Stage special skill.', fx: { ceiling: 8, special: 'big-stage' } },
 ];
