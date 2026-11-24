@@ -2,7 +2,7 @@ import React from 'react';
 import { careerOf } from '../engine';
 import { EQUIPMENT, PACKS, PACK_PRICES } from '../data';
 import type { PackTier, StaffKey } from '../types';
-import { Cards } from './Cards';
+import { Cards, ArtImg } from './Cards';
 import { Team } from './Team';
 import { money } from './common';
 import { ArTabs } from './arena/kit';
@@ -21,9 +21,10 @@ export function Improve({ u, sub, go, busy, a, onPlayer }: {
     {tab === 'cards' && <Cards u={u} busy={busy} onOpen={a.openPack} onMerge={a.mergePacks} onPlay={a.playCard} onSell={a.sellCard} />}
     {tab === 'shop' && <section className="cs-panel">
       <div className="cs-title-row"><h2>Card shop</h2><span className="muted">Packs bought here land in Cards, ready to open.</span></div>
-      <div className="cs-packs">{(Object.keys(PACKS) as PackTier[]).map((t) => <div key={t} className="cs-pack" style={{ background: PACKS[t].color }}>
-        <strong>{PACKS[t].name}</strong><span>{PACKS[t].cards} cards · {Object.entries(PACKS[t].odds).filter(([, v]) => v > 0).map(([r, v]) => `${r} ${Math.round(v * 100)}%`).join(' · ')}</span>
-        <button disabled={busy || c.money < PACK_PRICES[t]} onClick={() => a.buyPack(t)}>Buy · {money(PACK_PRICES[t])}</button>
+      <div className="tc-packs">{(Object.keys(PACKS) as PackTier[]).map((t) => <div key={t} className="tc-pack" style={{ ['--pc' as any]: PACKS[t].color, ['--pa' as any]: PACKS[t].accent }}>
+        <div className="tc-pack-foil"><ArtImg className="tc-pack-img" srcs={[`${import.meta.env.BASE_URL}art/packs/${t}.webp`]} /><strong>{PACKS[t].name.replace(' pack', '')}</strong><small>PACK · {PACKS[t].cards} CARDS</small><i className="tc-pack-shine" /></div>
+        <ul className="tc-odds">{Object.entries(PACKS[t].odds).filter(([, v]) => v > 0).map(([r, v]) => <li key={r} className={`r-${r}`}><i />{r}<b>{Math.round(v * 100)}%</b></li>)}</ul>
+        <div className="tc-pack-actions"><button className="tc-open" disabled={busy || c.money < PACK_PRICES[t]} onClick={() => a.buyPack(t)}>Buy · {money(PACK_PRICES[t])}</button></div>
       </div>)}</div>
     </section>}
     {tab === 'equipment' && <section className="cs-panel">

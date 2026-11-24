@@ -23,7 +23,7 @@ import {
 import { CARD_LIST, CARD_MAP, CARD_SELL } from './cards';
 import { MILESTONE_MAP, TITLE_COINS, TRINKET_MAP } from './legacy';
 import { rollDecision, turnProDecision, retirementDecision } from './decisions';
-import type { MatchRecord, SlotPlan, Career, CareerFx, Decision, Effects, Intensity, MatchLine, PackTier, Rarity, SkillKey, Skills, StaffKey, Surface, Tour, WeekPlan, WeekReport } from './types';
+import type { MonthReview, MonthSnapshot, MatchRecord, SlotPlan, Career, CareerFx, Decision, Effects, Intensity, MatchLine, PackTier, Rarity, SkillKey, Skills, StaffKey, Surface, Tour, WeekPlan, WeekReport } from './types';
 
 export const CAREER_VERSION = 1;
 export const START_YEAR = 2026;
@@ -212,11 +212,13 @@ export function createCareer(setup: CareerSetup) {
     trinkets: [...setup.trinkets], noInjuryUntilYear: noInj ? START_YEAR + noInj - 1 : 0, seasonReview: null,
     retired: false, legacy: null, seed: rng.seed, uid: 1,
     matchLog: [], tournamentLog: [], unlocks: [], skillLog: [], equipment: [], watched: {},
+    monthStart: null, monthReview: null,
   };
   u.career = c;
   u.followedPlayerIds = [p.id];
   applySkills(u);
   refreshRankings(u.players[setup.tour]);
+  c.monthStart = monthSnapshot(u);
   u.magazine.unshift({ id: `story-career-${seed}`, year: START_YEAR, week: 1, category: 'Juniors', headline: `${setup.firstName} ${setup.lastName} starts out`, body: `A ${setup.startAge}-year-old ${setup.style.toLowerCase()} from ${setup.country} begins the long road from the junior circuit.`, importance: 2, playerIds: [p.id], tour: setup.tour });
   beginWeek(u);
   return u;
@@ -553,8 +555,8 @@ export function finishWeek(u: any) {
       prize += PRIZE[ev.level]?.[result] ?? 0;
       residual = result === 'W' || result === 'F' ? 0 : result === 'SF' ? 0.1 : result === 'QF' ? 0.2 : 0.4;
       if (result === 'W') titleRewards(u, c, p, ev, rewards);
-      else if (result === 'F' && levelRank(ev.level) >= 45) { c.packs.push('silver'); rewards.push('Silver pack (final)'); }
-      else if (result === 'F' || result === 'SF') { c.packs.push('bronze'); rewards.push(`Bronze pack (${ROUND_NAME[result].toLowerCase()})`); }
+      else if (result === 'F' && levelRank(ev.level) >= 45) { c.packs.push('silver'); rewards.push(`${PACKS.silver.name} (final)`); }
+      else if (result === 'F' || result === 'SF') { c.packs.push('bronze'); rewards.push(`${PACKS.bronze.name} (${ROUND_NAME[result].toLowerCase()})`); }
       if (ev.level === 'Grand Slam') { milestone(u, c, 'slam-debut', rewards); if (['QF', 'SF', 'F', 'W'].includes(result)) milestone(u, c, 'slam-qf', rewards); if (['F', 'W'].includes(result)) milestone(u, c, 'slam-final', rewards); }
       if (ev.level === 'Finals') milestone(u, c, 'finals', rewards);
       if (['Grand Slam', '1000'].includes(ev.level) && ['QF', 'SF', 'F', 'W'].includes(result)) unlockSpecial(c, 'big-stage', rewards);
@@ -662,7 +664,7 @@ export function finishWeek(u: any) {
 
   // rewards over time
   bump(c, 'weeks');
-  if ((c.counters.weeks ?? 0) % 4 === 0) { c.packs.push('bronze'); rewards.push('Bronze pack (monthly training)'); }
+  if ((c.counters.weeks ?? 0) % 4 === 0) { c.packs.push('bronze'); rewards.push(`${PACKS.bronze.name} (monthly training)`); }
   const jr = juniorRank(u);
   if (jr != null) c.counters['junior-best'] = Math.min(c.counters['junior-best'] ?? 999, jr);
   if (jr != null && jr <= 10) milestone(u, c, 'junior-top10', rewards);
@@ -685,10 +687,42 @@ export function finishWeek(u: any) {
   if (c.reports.length > 60) c.reports.length = 60;
   saveRng(c, rng);
 
+  // month in review
+  const prevMonth = monthIndex(pw.week), nowMonth = u.seasonEnded ? 12 : monthIndex(u.week);
+  if (nowMonth !== prevMonth) { if (c.monthStart) c.monthReview = buildMonthReview(u, c.monthStart); c.monthStart = monthSnapshot(u); }
+
   if (u.seasonEnded) seasonEnd(u);
   else beginWeek(u);
   applySkills(u);
 }
+
+export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export function monthIndex(week: number) { return Math.min(11, Math.floor((week - 1) / 4.34)); }
+export function monthSnapshot(u: any): MonthSnapshot {
+  const c = careerOf(u), p = me(u);
+  return { year: u.year, month: monthIndex(u.week), week: u.week, base: { ...c.base }, rank: p.ranking, ranked: (p.rankingPoints || 0) > 0, juniorRank: juniorRank(u), money: c.money, totalPrize: c.totalPrize, fame: p.fame || 0, ovr: overall(p), unlocks: c.unlocks.length, matches: c.matchLog.length, tournaments: c.tournamentLog.length };
+}
+function buildMonthReview(u: any, from: MonthSnapshot): MonthReview {
+  const c = careerOf(u);
+  const to = monthSnapshot(u);
+  const ms = c.matchLog.slice(from.matches);
+  const ts = c.tournamentLog.slice(from.tournaments);
+  const skillDelta: Partial<Skills> = {};
+  for (const k of SKILL_KEYS) { const d = c.base[k] - from.base[k]; if (Math.abs(d) >= 0.05) skillDelta[k] = Math.round(d * 10) / 10; }
+  const best = ms.filter((m) => m.won && !m.junior && m.oppRank < 999).sort((a, b) => a.oppRank - b.oppRank)[0];
+  const reps = c.reports.filter((r) => (r.year > from.year || (r.year === from.year && r.week >= from.week)));
+  return {
+    year: from.year, month: from.month, label: `${MONTH_NAMES[from.month]} ${from.year}`, from, to,
+    wins: ms.filter((m) => m.won).length, losses: ms.filter((m) => !m.won).length,
+    titles: ts.filter((t) => t.result === 'W').map((t) => t.event),
+    tournaments: ts.map((t) => ({ event: t.event, level: t.level, result: t.result, prize: t.prize })),
+    bestWin: best ? { name: best.oppName, rank: best.oppRank, event: best.event } : null,
+    skillDelta, unlocks: c.unlocks.slice(from.unlocks),
+    packs: reps.reduce((n, r) => n + r.rewards.filter((x) => /pack/i.test(x)).length, 0),
+    injuries: reps.map((r) => r.lines.find((l) => /injur/i.test(l))).filter(Boolean) as string[],
+  };
+}
+export function dismissMonthReview(u: any) { careerOf(u).monthReview = null; }
 
 export function orientSets(m: any, myId: string) {
   const flip = m.playerA !== myId;
@@ -758,8 +792,8 @@ function milestone(u: any, c: Career, id: string, rewards: string[]) {
   coin(c, `m-${id}`, def.label, def.coins);
   c.coinEvents[c.coinEvents.length - 1].milestone = id;
   rewards.push(`🏆 ${def.label} (+${Math.round(def.coins * c.fx.coinMult)} coins)`);
-  if (['top100', 'tour-title', 'slam-qf', 'junior-slam'].includes(id)) { c.packs.push('gold'); rewards.push('Gold pack (milestone)'); }
-  if (['top10', 'slam-title', 'masters-title', 'no1'].includes(id)) { c.packs.push('elite'); rewards.push('Elite pack (milestone)'); }
+  if (['top100', 'tour-title', 'slam-qf', 'junior-slam'].includes(id)) { c.packs.push('gold'); rewards.push(`${PACKS.gold.name} (milestone)`); }
+  if (['top10', 'slam-title', 'masters-title', 'no1'].includes(id)) { c.packs.push('elite'); rewards.push(`${PACKS.elite.name} (milestone)`); }
 }
 function unlockSpecial(c: Career, id: string, notes: string[]) {
   if (c.specials.includes(id) || !SPECIAL_MAP[id]) return;

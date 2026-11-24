@@ -1,3 +1,4 @@
+import { faceUrl } from '../career/faces.ts';
 // Tennis World Chronicle portrait library.
 // Finished 128x128 portraits only. Faces, skin tone, hair, gender and appearance are baked into each asset.
 // No runtime face assembly, skin recoloring or facial-component overlays.
@@ -128,6 +129,8 @@ export function assignedPortrait(player){
   const family=portraitFamily(player),tier=portraitTier(player),asset=chooseAsset(player,family,tier);
   return asset?{asset,family,tier,gender:portraitGender(player),fallback:tier==='elite'&&asset.tier!=='elite'}:null;
 }
-export function portraitUrl(player){const assigned=assignedPortrait(player);return assigned?`${import.meta.env.BASE_URL}portraits-tennis/${assigned.asset.file}`:'';}
+// Tennis Stars: faces are procedural (src/career/faces.ts); the photo library stays for reference.
+export function portraitUrl(player){return player?faceUrl(player):'';}
+export function photoPortraitUrl(player){const assigned=assignedPortrait(player);return assigned?`${import.meta.env.BASE_URL}portraits-tennis/${assigned.asset.file}`:'';}
 export function portraitPresentation(player){const fame=Number(player?.fame)||0;return fame>=2200?'iconic':fame>=900?'famous':fame>=300?'known':'emerging';}
 export const PORTRAIT_LIBRARY_STATS={eliteAvailable:ELITE_PORTRAITS.length,standardAvailable:STANDARD_PORTRAITS.length,sourceSize:128,version:'0.6.6'};

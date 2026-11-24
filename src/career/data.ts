@@ -135,11 +135,13 @@ export const SPECIALS: SpecialDef[] = [
 export const SPECIAL_MAP: Record<string, SpecialDef> = Object.fromEntries(SPECIALS.map((s) => [s.id, s]));
 
 export const RARITY_COLOR: Record<Rarity, string> = { common: '#9aa5ad', uncommon: '#2fae68', rare: '#2f7bf0', epic: '#9a4cf0', legendary: '#e8a400' };
-export const PACKS: Record<PackTier, { name: string; cards: number; odds: Record<Rarity, number>; color: string }> = {
-  bronze: { name: 'Bronze pack', cards: 3, odds: { common: .72, uncommon: .22, rare: .055, epic: .005, legendary: 0 }, color: '#b87333' },
-  silver: { name: 'Silver pack', cards: 4, odds: { common: .45, uncommon: .35, rare: .16, epic: .035, legendary: .005 }, color: '#a8b2bd' },
-  gold: { name: 'Gold pack', cards: 4, odds: { common: .15, uncommon: .38, rare: .32, epic: .12, legendary: .03 }, color: '#e3b52b' },
-  elite: { name: 'Elite pack', cards: 5, odds: { common: 0, uncommon: .2, rare: .45, epic: .27, legendary: .08 }, color: '#7d3cff' },
+// Packs share the rarity colour system: each pack wears the colour of the best rarity it usually brings.
+// (IDs stay bronze/silver/gold/elite for save compatibility; only names and colours are shown.)
+export const PACKS: Record<PackTier, { name: string; cards: number; odds: Record<Rarity, number>; color: string; accent: string; rarity: Rarity }> = {
+  bronze: { name: 'Club pack', cards: 3, odds: { common: .72, uncommon: .22, rare: .055, epic: .005, legendary: 0 }, color: '#2fae68', accent: '#bff5d6', rarity: 'uncommon' },
+  silver: { name: 'Tour pack', cards: 4, odds: { common: .45, uncommon: .35, rare: .16, epic: .035, legendary: .005 }, color: '#2f7bf0', accent: '#cfe2ff', rarity: 'rare' },
+  gold: { name: 'Pro pack', cards: 4, odds: { common: .15, uncommon: .38, rare: .32, epic: .12, legendary: .03 }, color: '#9a4cf0', accent: '#e6d3ff', rarity: 'epic' },
+  elite: { name: 'Champion pack', cards: 5, odds: { common: 0, uncommon: .2, rare: .45, epic: .27, legendary: .08 }, color: '#e8a400', accent: '#fff0b8', rarity: 'legendary' },
 };
 
 export type { CardDef };

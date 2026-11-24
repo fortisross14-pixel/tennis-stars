@@ -32,6 +32,15 @@ export interface MatchRecord {
   tags: string[]; minutes: number; qualifying?: boolean; junior?: boolean;
 }
 export interface TournamentRecord { year: number; week: number; age: number; event: string; level: string; surface: string; entry: string; result: string; prize: number; doubles?: string | null; eventId: string }
+export interface MonthSnapshot { year: number; month: number; week: number; base: Skills; rank: number; ranked: boolean; juniorRank: number | null; money: number; totalPrize: number; fame: number; ovr: number; unlocks: number; matches: number; tournaments: number }
+export interface MonthReview {
+  year: number; month: number; label: string;
+  from: MonthSnapshot; to: MonthSnapshot;
+  wins: number; losses: number; titles: string[];
+  tournaments: { event: string; level: string; result: string; prize: number }[];
+  bestWin: { name: string; rank: number; event: string } | null;
+  skillDelta: Partial<Skills>; unlocks: UnlockRecord[]; packs: number; injuries: string[];
+}
 export interface UnlockRecord { kind: 'special' | 'milestone' | 'equipment'; id: string; label: string; year: number; week: number; age: number }
 
 export interface CardInstance { uid: string; id: string }
@@ -132,4 +141,6 @@ export interface Career {
   skillLog: { year: number; age: number; skills: Skills; ceiling: Skills }[];
   equipment: string[];
   watched: Record<string, boolean>;
+  monthStart: MonthSnapshot | null;
+  monthReview: MonthReview | null;
 }

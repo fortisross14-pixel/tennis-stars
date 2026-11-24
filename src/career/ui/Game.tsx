@@ -15,6 +15,7 @@ import { Schedule } from './Schedule';
 import { MatchViewer } from './MatchViewer';
 import { ArenaWeek, monthOf } from './arena/ArenaWeek';
 import { ArenaMatch } from './arena/ArenaMatch';
+import { MonthReview } from './arena/MonthReview';
 import { ArTabs, ArModal, Confetti, CountUp, Toast, haptic, installRipple } from './arena/kit';
 import * as SS from '../../sim/season.js';
 import { money, ordinalRank } from './common';
@@ -153,7 +154,7 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
 
   const active = ['player', 'rivalry', 'match', 'tournament'].includes(pg) ? 'world' : ['event', 'replay'].includes(pg) ? 'week' : pg;
   const rec = replay ? c.matchLog.find((m) => m.id === replay) : null;
-  const decisionOpen = c.decision && !u.seasonEnded && !c.retired;
+  const decisionOpen = c.decision && !u.seasonEnded && !c.retired && !c.monthReview;
   return <div className="ar" role="application">
     <header className="ar-shell-top">
       <button className="ar-brand" onClick={() => go('week')}><i>TS</i><span><b>Tennis Stars</b><small>{p.firstName} {p.lastName}</small></span></button>
@@ -173,6 +174,7 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
       <div className="ar-choices">{c.decision!.options.map((o) => <button key={o.id} className="ar-choice" disabled={busy} onClick={() => { haptic(); a.decision(o.id); }}><strong>{o.label}</strong><span>{o.desc}</span></button>)}</div>
     </ArModal>}
     {rec && <div className="ar-skin"><MatchViewer match={rec} me={p} opp={[...u.players[tour], ...u.juniors[tour], ...(u.retiredPlayers?.[tour] || [])].find((x: any) => x.id === rec.oppId) ?? { firstName: rec.oppName, lastName: '', country: rec.oppCountry, ranking: rec.oppRank }} onClose={() => setReplay(null)} /></div>}
+    {c.monthReview && !busy && !u.liveEvent && pg !== 'replay' && <MonthReview r={c.monthReview} me={p} tour={tour} onDone={() => { c.monthReview = null; a.save(); setArenaKey((k) => k + 1); }} />}
     {!busy && <Toast text={notice} />}
   </div>;
 }

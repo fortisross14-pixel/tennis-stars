@@ -1,7 +1,7 @@
 // Old saves must never break. Every field added to Career gets a default here;
 // loading runs the Chronicle world migration first, then this.
 import * as M from '../sim/migrations.js';
-import { CAREER_VERSION, buildFx, applySkills } from './engine';
+import { CAREER_VERSION, buildFx, applySkills, monthSnapshot } from './engine';
 import type { Career } from './types';
 import { MILESTONE_MAP } from './legacy';
 import { SPECIAL_MAP } from './data';
@@ -15,6 +15,7 @@ const DEFAULTS: Partial<Career> = {
   milestones: {}, counters: {}, coinEvents: [], coinsTotal: 0, trinkets: [], noInjuryUntilYear: 0, seasonReview: null,
   retired: false, legacy: null, uid: 1,
   matchLog: [], tournamentLog: [], unlocks: [], skillLog: [], equipment: [], watched: {},
+  monthStart: null, monthReview: null,
 };
 
 export function migrateCareer(u: any) {
@@ -29,6 +30,7 @@ export function migrateCareer(u: any) {
   }
   c.fx = { ...buildFx(c.trinkets ?? [], {}), ...(c.fx ?? {}) };
   if (!c.current) c.current = { kind: 'train', ...c.defaultTrain };
+  if (!c.monthStart && !c.retired) c.monthStart = monthSnapshot(u);
   c.version = CAREER_VERSION;
   u.settings.seasonSetupComplete = true;
   if (!c.retired) applySkills(u);

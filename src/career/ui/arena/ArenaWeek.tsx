@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArTabs, useSwipe, useTilt, haptic } from './kit';
 import { portraitUrl } from '../../../data/portraitLibrary.js';
 import { careerOf, me, projectWeek, asSlots, restWeek, overall, juniorRank, type EventOption } from '../../engine';
-import { FOCUSES, INTENSITY, PRIZE, SLOT_ACTIVITIES, REGION } from '../../data';
+import { FOCUSES, INTENSITY, PRIZE, SLOT_ACTIVITIES, REGION, PACKS } from '../../data';
 import * as T from '../../../sim/tournament.js';
 import type { Intensity, SlotPlan, WeekPlan } from '../../types';
 import { money, levelLabel } from '../common';
@@ -123,7 +123,7 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit, onAuto, extraTabs }
             <div className="ar-rewards"><h4>Rewards</h4>
               <div className="ar-reward"><span>💵</span>Champion {money(winPrize)}</div>
               <div className="ar-reward"><span>📈</span>{winPts} {isJunior ? 'junior ' : ''}ranking points</div>
-              <div className="ar-reward"><span>🎁</span>{['Grand Slam', '1000', 'Finals'].includes(ev.level) ? 'Elite' : ['500', '250', 'Junior Slam'].includes(ev.level) ? 'Gold' : ['Challenger', 'WTA 125', 'Junior 500'].includes(ev.level) ? 'Silver' : 'Bronze'} pack for the title</div>
+              <div className="ar-reward"><span>🎁</span>{PACKS[['Grand Slam', '1000', 'Finals'].includes(ev.level) ? 'elite' : ['500', '250', 'Junior Slam'].includes(ev.level) ? 'gold' : ['Challenger', 'WTA 125', 'Junior 500'].includes(ev.level) ? 'silver' : 'bronze'].name} for the title</div>
               <div className="ar-reward"><span>✈</span>Travel {money(focused!.travel)}</div>
             </div>
           </div>
