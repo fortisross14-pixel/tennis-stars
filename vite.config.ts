@@ -4,4 +4,5 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   base: '/tennis-stars/',
+  build: { target: 'es2020', sourcemap: false, chunkSizeWarningLimit: 1500 },
 });
