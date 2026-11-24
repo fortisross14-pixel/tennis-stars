@@ -8,6 +8,9 @@ import { upgradeCost, type Meta } from '../meta';
 import type { SlotMeta } from '../storage';
 import type { CareerSetup } from '../engine';
 import { Modal } from './common';
+import '../ui/arena/arena.css';
+import '../ui/arena/skin.css';
+import { installRipple } from './arena/kit';
 import { installState, onInstallChange, promptInstall } from '../install';
 import { useEffect } from 'react';
 
@@ -28,9 +31,10 @@ export function Menu({ slots, meta, busy, storageOk, onNew, onLoad, onDelete, on
   onBuy: (id: string) => void; onCrate: (id: string) => Promise<string | null>; onEquip: (id: string) => void;
 }) {
   const [wizard, setWizard] = useState<number | null>(null);
+  useEffect(() => { installRipple(); }, []);
   const [tab, setTab] = useState<'upgrades' | 'trinkets' | 'hall'>('upgrades');
   const [pulled, setPulled] = useState<string | null>(null);
-  return <div className="cs-menu">
+  return <div className="ar"><div className="ar-skin cs-menu">
     <section className="cs-menu-hero">
       <div className="court-mark">TS</div>
       <h1>Tennis Stars</h1>
@@ -79,7 +83,7 @@ export function Menu({ slots, meta, busy, storageOk, onNew, onLoad, onDelete, on
     </section>
     {wizard != null && <NewCareer meta={meta} busy={busy} onCancel={() => setWizard(null)} onCreate={(setup) => { onNew(wizard, setup); setWizard(null); }} />}
     {pulled && <Modal title="Crate opened" onClose={() => setPulled(null)}><div className="cs-pull" style={{ borderColor: TRINKET_COLOR[TRINKET_MAP[pulled.split(':')[0]].rarity] }}><span>{TRINKET_MAP[pulled.split(':')[0]].icon}</span><strong>{TRINKET_MAP[pulled.split(':')[0]].name}</strong><p>{TRINKET_MAP[pulled.split(':')[0]].desc}</p>{pulled.includes(':dup') && <em>Duplicate: part of the cost was refunded.</em>}</div></Modal>}
-  </div>;
+  </div></div>;
 }
 
 function NewCareer({ meta, busy, onCancel, onCreate }: { meta: Meta; busy: boolean; onCancel: () => void; onCreate: (s: Omit<CareerSetup, 'upgrades' | 'trinkets'>) => void }) {

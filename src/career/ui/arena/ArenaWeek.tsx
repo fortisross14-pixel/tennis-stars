@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArTabs, useSwipe, useTilt, haptic } from './kit';
 import { portraitUrl } from '../../../data/portraitLibrary.js';
 import { careerOf, me, projectWeek, asSlots, restWeek, overall, juniorRank, type EventOption } from '../../engine';
 import { FOCUSES, INTENSITY, PRIZE, SLOT_ACTIVITIES, REGION } from '../../data';
@@ -42,11 +43,13 @@ export function TopBar({ u, crumb, title, onExit }: { u: any; crumb: string; tit
 
 type Tab = 'tournaments' | 'training';
 
-export function ArenaWeek({ u, busy, onPlan, onPlay, onExit }: { u: any; busy: boolean; onPlan: (p: WeekPlan) => void; onPlay: () => void; onExit: () => void }) {
+export function ArenaWeek({ u, busy, onPlan, onPlay, onExit, onAuto, extraTabs }: { u: any; busy: boolean; onPlan: (p: WeekPlan) => void; onPlay: () => void; onExit: () => void; onAuto?: (n: number) => void; extraTabs?: React.ReactNode }) {
   const c = careerOf(u), p = me(u);
   const options = useMemo(() => projectWeek(u).filter((o) => o.status !== 'ineligible'), [u, u.week, p.ranking]);
   const plan = c.current;
   const sel = (plan.kind === 'compete' || plan.kind === 'junior') ? plan.eventId : null;
+  const stageRef = useRef<HTMLDivElement>(null), heroRef = useRef<HTMLElement>(null);
+  useTilt(heroRef, 4);
   const [tab, setTab] = useState<Tab>(sel ? 'tournaments' : options.some((o) => ['direct', 'qualifying', 'wildcard'].includes(o.status)) ? 'tournaments' : 'training');
   const [filter, setFilter] = useState<'all' | 'junior' | 'pro'>('all');
   const [focus, setFocus] = useState<string | null>(sel ?? options[0]?.event.id ?? null);
@@ -60,12 +63,12 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit }: { u: any; busy: b
     const junior = !u.calendar.some((e: any) => e.id === o.event.id);
     onPlan(sel === o.event.id ? { kind: 'slots', slots } : junior ? { kind: 'junior', eventId: o.event.id } : { kind: 'compete', eventId: o.event.id, doubles: o.doublesOk });
   };
+  useSwipe(stageRef, () => setTab('training'), () => setTab('tournaments'));
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'SELECT') return;
       if (e.key === 'q' || e.key === 'Q') setTab('tournaments');
       else if (e.key === 'e' || e.key === 'E') setTab('training');
-      else if (e.key === 'Escape') onExit();
       else if (e.key === 'Enter' && !busy && !c.decision) onPlay();
       else if (tab === 'tournaments' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
         e.preventDefault();
@@ -85,16 +88,12 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit }: { u: any; busy: b
   const label = injured ? 'Rehab week' : sel ? 'Play' : 'Start week';
   const jr = juniorRank(u);
 
-  return <div className="ar" role="application" aria-label="Week schedule">
-    <TopBar u={u} crumb="My career" title="Week schedule" onExit={onExit} />
-    <nav className="ar-tabs ar-in-up" aria-label="Week tabs">
-      <span className="ar-key">Q</span>
-      <button className={tab === 'tournaments' ? 'on' : ''} onClick={() => setTab('tournaments')}>Tournaments</button>
-      <button className={tab === 'training' ? 'on' : ''} onClick={() => setTab('training')}>Training week</button>
-      <span className="ar-key">E</span>
-    </nav>
-
-    {c.decision && <div className="ar-stage" style={{ paddingBottom: 0 }}><div className="ar-panel ar-in-up" style={{ padding: 18, gridColumn: '1/-1' }}><b style={{ fontFamily: 'var(--ar-head)', fontSize: 22 }}>❗ {c.decision.title}</b><p style={{ margin: '6px 0 0', color: 'var(--ar-dim)' }}>Answer this decision in the classic view first (preview limitation).</p></div></div>}
+  return <div ref={stageRef} className="ar-week" aria-label="Week schedule">
+    <div className="ar-subbar">
+      <ArTabs tabs={[['tournaments', 'Tournaments'], ['training', 'Training week']]} value={tab} onChange={setTab} keys={['Q', 'E']} />
+      {extraTabs}
+      <span className="ar-chip">Week <b>{u.week}</b> of 52 · age {p.age}</span>
+    </div>
 
     {tab === 'tournaments' ? <div className="ar-stage">
       <section className="ar-list">
@@ -103,13 +102,13 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit }: { u: any; busy: b
         {!shown.length && <div className="ar-panel ar-empty">No events here this week. Switch to Training week (E).</div>}
         {shown.map((o, i) => { const [a, b] = COURT[o.event.surface] ?? COURT.Hard; const can = ['direct', 'qualifying', 'wildcard', 'alternate'].includes(o.status); return <button key={o.event.id} style={{ animationDelay: `${i * 45}ms` }}
           className={`ar-event ${sel === o.event.id ? 'on' : ''} ${can ? '' : 'off'} ${focused?.event.id === o.event.id && sel !== o.event.id ? 'focus' : ''}`}
-          onMouseEnter={() => setFocus(o.event.id)} onFocus={() => setFocus(o.event.id)} onClick={() => pick(o)}>
+          onPointerEnter={(e) => { if (e.pointerType === 'mouse') setFocus(o.event.id); }} onFocus={() => setFocus(o.event.id)} onClick={() => { haptic(); pick(o); }}>
           <span className="ar-thumb"><i style={{ background: `linear-gradient(135deg,${a},${b})` }} /><b>{levelLabel(o.event.level, c.tour).replace('Junior continental', 'JR CONT')}</b></span>
           <span><strong>{o.event.name}</strong><small>{o.event.location} · {o.event.surface} · draw {o.event.drawSize}</small></span>
           <span className={`ar-status ${o.status}`}>{sel === o.event.id ? '✓ ' : ''}{STATUS[o.status]}</span>
         </button>; })}
       </section>
-      <section className="ar-hero ar-in-right" key={ev?.id ?? 'none'}>
+      <section ref={heroRef} className="ar-hero ar-in-right ar-tilt" key={ev?.id ?? 'none'}>
         {ev ? <>
           <Court surface={ev.surface} />
           <div className="ar-hero-title"><h2>{ev.name}</h2><p>📍 {ev.location}, {ev.country} ({REGION_NAME[REGION[ev.country]] ?? 'International'}) · Week {ev.week}</p></div>
@@ -145,9 +144,9 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit }: { u: any; busy: b
     </div>}
 
     <footer className="ar-foot">
-      <span className="ar-hint"><button onClick={onExit}><span className="ar-key">Esc</span> Back</button></span>
-      <span className="ar-hint hide-sm"><span className="ar-key">↑↓</span> Browse <span className="ar-key">Space</span> Select</span>
-      <button className="ar-play" disabled={busy || !!c.decision} onClick={onPlay}><span className="ar-key">⏎</span>{busy ? 'Playing…' : label}</button>
+      <span className="ar-hint hide-sm kb-only"><span className="ar-key">↑↓</span> Browse <span className="ar-key">Space</span> Select</span>
+      {onAuto && <button className="ar-secondary" disabled={busy || !!c.decision} onClick={() => onAuto(4)}>Autopilot ×4</button>}
+      <button className="ar-play" disabled={busy || !!c.decision} onClick={() => { haptic(14); onPlay(); }}><span className="ar-key">⏎</span>{busy ? 'Playing…' : label}</button>
     </footer>
   </div>;
 }

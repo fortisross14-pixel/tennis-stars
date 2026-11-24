@@ -5,6 +5,7 @@ import type { PackTier, StaffKey } from '../types';
 import { Cards } from './Cards';
 import { Team } from './Team';
 import { money } from './common';
+import { ArTabs } from './arena/kit';
 
 const SUBTABS: [string, string][] = [['cards', 'Cards'], ['shop', 'Shop'], ['equipment', 'Equipment'], ['team', 'Team & doubles']];
 const SLOT_NAME: Record<string, string> = { racquet: 'Racquet', strings: 'Strings', shoes: 'Shoes', body: 'Recovery gear', tech: 'Analysis' };
@@ -16,7 +17,7 @@ export function Improve({ u, sub, go, busy, a, onPlayer }: {
   const c = careerOf(u);
   const tab = SUBTABS.some(([k]) => k === sub) ? sub : 'cards';
   return <div className="cs-page">
-    <nav className="cs-subnav">{SUBTABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => go('improve', k)}>{l}{k === 'cards' && c.packs.length ? <em className="cs-badge">{c.packs.length}</em> : null}</button>)}<span className="cs-subnav-money">Bank {money(c.money)}</span></nav>
+    <div className="ar-subbar flat"><ArTabs small tabs={SUBTABS} value={tab} onChange={(k) => go('improve', k)} badge={{ cards: c.packs.length || undefined } as any} /><span className="ar-chip">Bank <b>{money(c.money)}</b></span></div>
     {tab === 'cards' && <Cards u={u} busy={busy} onOpen={a.openPack} onMerge={a.mergePacks} onPlay={a.playCard} onSell={a.sellCard} />}
     {tab === 'shop' && <section className="cs-panel">
       <div className="cs-title-row"><h2>Card shop</h2><span className="muted">Packs bought here land in Cards, ready to open.</span></div>

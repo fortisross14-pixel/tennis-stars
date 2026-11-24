@@ -14,3 +14,6 @@
   with several Masters and sometimes a Slam; Epic is a top-10 Masters winner; Legend wins multiple Slams.
 - Storage goes through `src/career/storage.ts` (IndexedDB). Never call `localStorage` directly:
   the github.io origin is shared with many other games and its localStorage is usually full.
+- UI: the Arena look lives in `src/career/ui/arena/` (`kit.tsx` for tabs, swipe, count-up, confetti, modal;
+  `arena.css`; `skin.css` darkens the reused Chronicle and classic panels). Keep tap targets ≥ 44px, never rely on
+  hover alone, and check tablet portrait/landscape (Playwright devices "iPad Pro 11" and "iPad Pro 11 landscape").

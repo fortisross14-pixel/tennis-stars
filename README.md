@@ -21,6 +21,10 @@ media day.
 - Prize money buys card packs, equipment and staff (Improvement). Boost cards, such as Inspiration (+5% to all
   skills), last until the end of your next tournament.
 
+The interface is the **Arena** look: broadcast-style dark blue screens, animated tabs, page transitions and
+an animated match (a rally on court for every game, holds and breaks called out, stops after each set),
+built for touch and tablets as well as desktop. Installable as an app (PWA); saves live in IndexedDB.
+
 Navigation: **This week** (plan and schedule), **Overview**, **Career** (overview, seasons, matches,
 tournaments, milestones & skills), **Improvement** (cards, shop, equipment, team & doubles) and **World**
 (rankings, calendar, tournaments, players, juniors, doubles, national teams, news, records, almanac).

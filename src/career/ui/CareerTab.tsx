@@ -5,6 +5,7 @@ import { MILESTONES } from '../legacy';
 import { SPECIALS, ROUND_NAME, ROUND_ORDER, SKILLS } from '../data';
 import { money, levelLabel, roundLabel } from './common';
 import { ReportCard } from './Week';
+import { ArTabs } from './arena/kit';
 
 const SUBTABS: [string, string][] = [['overview', 'Overview'], ['seasons', 'Seasons'], ['matches', 'Matches'], ['tournaments', 'Tournaments'], ['progress', 'Milestones & skills']];
 const LEVEL_GROUPS: [string, string[]][] = [['Grand Slams', ['Grand Slam']], ['Finals & Olympics', ['Finals', 'Olympics']], ['Masters 1000', ['1000']], ['500', ['500']], ['250', ['250']], ['Challenger / 125', ['Challenger', 'WTA 125']], ['ITF', ['ITF']], ['Juniors', ['Junior Slam', 'Junior 500', 'Junior 200', 'Junior Finals', 'Continental']]];
@@ -13,7 +14,7 @@ const roundIdx = (r: string) => ROUND_ORDER.indexOf(r);
 export function CareerTab({ u, sub, go, onWatch, onPlayer, onTournament }: { u: any; sub: string; go: (page: string, ...parts: string[]) => void; onWatch: (id: string) => void; onPlayer: (id: string) => void; onTournament: (key: string) => void }) {
   const tab = SUBTABS.some(([k]) => k === sub) ? sub : 'overview';
   return <div className="cs-page">
-    <nav className="cs-subnav">{SUBTABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => go('career', k)}>{l}</button>)}</nav>
+    <div className="ar-subbar flat"><ArTabs small tabs={SUBTABS} value={tab} onChange={(k) => go('career', k)} /></div>
     {tab === 'overview' && <CareerOverview u={u} onPlayer={onPlayer} />}
     {tab === 'seasons' && <Seasons u={u} />}
     {tab === 'matches' && <Matches u={u} onWatch={onWatch} onPlayer={onPlayer} />}

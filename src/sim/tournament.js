@@ -37,6 +37,10 @@ function eligible(player,event,unavailable){
   if(player.skills?.endurance<60&&eventCount>=15)return false;
   if((player.weeksPlayedConsecutive||0)>=3&&event.level!=='Grand Slam'&&player.skills?.endurance<82)return false;
   if(player.junior&&(!['250','500','Challenger','WTA 125','ITF'].includes(event.level)||player.age<17))return false;
+  // Stars don't play the satellite circuit: ITFs are closed to the top 150, Challengers to the top 40.
+  const rk=effectiveRank(player);
+  if(event.level==='ITF'&&rk<=150)return false;
+  if(['Challenger','WTA 125'].includes(event.level)&&rk<=40)return false;
   return true;
 }
 
