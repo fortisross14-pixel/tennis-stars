@@ -33,23 +33,42 @@ variety comes from combining heads with hair, facial hair, accessories and kit c
 
 ### 2.1 Framing (identical for every piece)
 
-- Canvas **1024 × 1024 px**, transparent PNG, front-facing head and shoulders, camera at eye height, 85 mm portrait look.
-- Head centred on x = 512. **Eye line at y = 400**, pupils at x ≈ 437 and 587 (150 px apart), **chin at y ≈ 700**,
-  top of skull ≈ 170, shoulders reach the bottom corners. Templates in `docs/art-templates/` show the outline.
-- Lighting: soft studio key light from the upper left, gentle rim light on the right, no hard cast shadows.
+The approved anchor is `docs/art-templates/face-anchor.png`, and `face-anchor-guide.png` marks its lines. Every
+piece matches it exactly:
+
+- Canvas **1024 × 1024 px**, front-facing head and shoulders, camera at eye height, head centred on x = 512.
+- Top of skull y ≈ 150 · brows ≈ 370 · **eye line 405** (pupils at x ≈ 425 and 600) · nose base ≈ 512 · mouth ≈ 578 ·
+  **chin ≈ 700**.
+- Lighting as in the anchor: warm key light from the upper left, cool teal rim light on the right, plain grey background.
 - Expression: calm and focused, mouth closed, looking into the camera.
 
-### 2.2 Style anchor (make this first, then reuse its seed and settings)
+### 2.2 Style anchor (done)
+
+`face-anchor.png`. Use it as the reference image (image prompt or style reference) for every piece below, with
+the same model, seed family and settings. Its prompt, for regenerating or for new heads:
 
 > semi-realistic digital painting of a young professional tennis player, front-facing head-and-shoulders portrait,
-> looking straight at the camera, calm focused expression, mouth closed, soft studio key light from upper left, subtle
-> rim light, painterly but realistic skin with pores softened, clean edges, plain mid-grey background, modern
+> looking straight at the camera, calm focused expression, mouth closed, warm studio key light from upper left, subtle
+> teal rim light on the right, painterly but realistic skin, clean edges, plain mid-grey background, modern
 > sports videogame player card art, high detail, centred, symmetrical framing
 
 **Negative prompt:** cartoon, chibi, anime, big eyes, caricature, 3D render, plastic skin, photo, text, logo, watermark,
 jewellery, tilted head, smiling with teeth, hands, harsh shadows, real person likeness
 
-Approve one anchor and keep it as the reference image (image prompt or style reference) for every piece below.
+### 2.2b Feature pieces: eyes, nose and mouth (`faces/eyes/<tone>-<n>.png`, `faces/nose/…`, `faces/mouth/…`)
+
+Swapping features works when every feature is **inpainted on a head of the same skin tone, at the anchor's exact
+position**, so lighting and skin match. Mask only the box, keep the rest of the head identical, then save the box
+region as a transparent PNG with a soft 24 px feathered edge. Boxes on the 1024 canvas:
+
+| Piece | Box (x1, y1 → x2, y2) | Includes | Prompt for [feature] |
+|---|---|---|---|
+| eyes | 340, 335 → 684, 455 | both eyes and eyebrows | *[deep-set / almond / hooded / round / narrow] [brown / hazel / green / blue / grey] eyes, [thick straight / arched / thin / bushy] eyebrows* |
+| nose | 448, 415 → 576, 535 | bridge, tip, nostrils | *[straight narrow / broad / small upturned / aquiline / button] nose* |
+| mouth | 428, 545 → 596, 628 | lips and the skin around them | *[full / thin / wide / small, bow-shaped] lips, mouth closed, neutral* |
+
+Make 4–6 of each per skin-tone group (start with 3 per group). The game combines a head with any eyes, nose and
+mouth of the same tone, so 3 heads × 5 eyes × 5 noses × 5 mouths = 375 faces per tone before hair.
 
 ### 2.3 Heads (`faces/head/<tour>-<tone>-<n>.png`, full colour)
 
@@ -94,7 +113,7 @@ file covers everyone. Hair that falls behind the shoulders or neck (ponytails, l
 
 ### 2.6 How the game assembles them
 
-Back to front: `background · hairBack · head (incl. shirt) · facialHair · hairFront · accessory`. The game picks a head
+Back to front: `background · hairBack · head (incl. shirt) · eyes · nose · mouth · facialHair · hairFront · accessory`. The game picks a head
 from the player's tour and skin tone, then hair, facial hair and accessory from their genes, tints the grey pieces and
 draws them on a canvas (a small compositor in `src/career/faces.ts`, about 50 lines, to be added when the first
 pieces arrive). Pieces are listed in `public/art/faces/manifest.json`, e.g.
