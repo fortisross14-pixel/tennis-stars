@@ -5,7 +5,7 @@ import { writeFileSync, readFileSync } from 'fs';
 import { CARD_LIST } from '../src/career/cards';
 import { TRINKETS, UPGRADES, MILESTONES } from '../src/career/legacy';
 import { EQUIPMENT, SPECIALS, FOCUSES, SLOT_ACTIVITIES, PACKS, STAFF } from '../src/career/data';
-import { HAIR_STYLES_M, HAIR_STYLES_F, ACCESSORIES } from '../src/career/faces';
+import { HAIR_STYLES_M, HAIR_STYLES_F } from '../src/career/faces';
 
 const STYLE = 'premium sports-videogame UI illustration, bold clean shapes, soft studio rim light, deep navy (#0b1f4a) to royal blue (#1d58b8) palette with orange (#ff7a3d) and teal (#3ee0cf) accents, crisp edges, no text, no logos, no watermark';
 const ICON = `single centered object, 3/4 view, ${STYLE}, transparent background, generous padding`;
@@ -45,22 +45,20 @@ const staff = table([['File', 'Staff', 'Prompt'], ...Object.entries(STAFF).map((
 const milestones = table([['File', 'Milestone', 'Prompt'], ...MILESTONES.map((m) => [`milestones/${m.id}.webp`, m.label, `medal or trophy icon for "${m.label}", ${ICON}`])]);
 const DECISIONS: [string, string][] = [['academy', 'a sunny clay-court academy in Spain with young players'], ['extra', 'a lone player practising at dusk under court lights'], ['sponsor', 'a photo shoot set with lights and a racquet on a stool'], ['press', 'a press conference table with microphones'], ['party', 'a rooftop party with city lights'], ['niggle', 'a shoulder with a glowing red pain spot and an ice pack'], ['hitting', 'a star player and a young hitting partner on a practice court'], ['federation', 'a national training centre entrance with flags'], ['coach-offer', 'a coach with a clipboard offering a handshake'], ['viral', 'a phone screen exploding with likes around a tweener shot'], ['exhibition', 'a glamorous desert exhibition stadium at night'], ['turn-pro', 'a junior trophy on one side and a pro tour locker on the other'], ['retire', 'an empty stadium at sunset with a racquet left on the baseline']];
 const decisions = table([['File', 'Decision', 'Prompt'], ...DECISIONS.map(([id, d]) => [`decisions/${id}.webp`, id, `${d}, cinematic, ${STYLE}, wide 16:9`])]);
-const faces = [
-  table([['Layer', 'Variants (file names)', 'Tinted?', 'Notes'],
-    ['head', '0 oval · 1 round · 2 long · 3 square · 4 heart', 'skin', 'face shape incl. jaw shading and cheeks, no features'],
-    ['ears', 'base', 'skin', 'both ears, at x 50–66 and 134–150, y 92–116'],
-    ['neck', 'base', 'skin', 'x 86–114, y 136–162'],
-    ['eyes', '0 round · 1 almond · 2 narrow · 3 wide · 4 soft', 'no (whites + iris in colour)', 'centres at (83,102) and (117,102)'],
-    ['brows', '0–4 (straight, arched, angled down, thick, raised)', 'hair', 'y ≈ 84–92'],
-    ['nose', '0–4 (small, straight, wide, button, long)', 'skin', 'tip at y ≈ 118'],
-    ['mouth', '0–4 (smile, neutral, open grin, small, smirk)', 'no', 'centred at (100,134)'],
-    ['facialHair', '1 stubble · 2 beard · 3 moustache · 4 goatee', 'hair', 'ATP only'],
-    ['hairBack', HAIR_STYLES_F.concat(['long']).filter((v, i, a) => a.indexOf(v) === i).join(' · '), 'hair', 'drawn behind the head (ponytails, long hair, braids)'],
-    ['hairFront', [...new Set([...HAIR_STYLES_M, ...HAIR_STYLES_F])].join(' · '), 'hair', 'on top of the head, hairline above y ≈ 70'],
-    ['shirt', 'base', 'no (tinted to country kit in code)', 'collar at y ≈ 154'],
-    ['accessory', ACCESSORIES.filter((a) => a !== 'none').filter((v, i, a) => a.indexOf(v) === i).join(' · '), 'no (kit colour in code)', 'headband across y ≈ 78–90; cap brim to x 160'],
-  ]),
-].join('\n');
+const HAIR_DESC: Record<string, string> = {
+  buzz: 'very short buzz cut, even length all over', crop: 'short textured crop, slightly messy fringe', sidepart: 'classic short side part, neatly combed',
+  quiff: 'short sides with a swept-up quiff on top', curly: 'short tight curls on top, shorter sides', afro: 'full rounded afro',
+  messy: 'medium-length tousled messy hair', receding: 'short hair with a receding hairline at the temples', bald: '(no file: the bald head is used)',
+  long: 'shoulder-length straight hair tucked behind the ears', manbun: 'hair pulled back into a small bun at the back of the head',
+  ponytail: 'hair pulled back into a sporty mid ponytail, a few loose strands at the temples', bun: 'hair pulled up into a neat top bun',
+  bob: 'chin-length bob with a light fringe', braids: 'two long box braids hanging in front of the shoulders', pixie: 'short pixie cut with a side-swept fringe',
+  highpony: 'high ponytail on the crown, sleek sides',
+};
+const BACK = new Set(['long', 'ponytail', 'highpony', 'bob', 'braids', 'afro', 'manbun', 'bun']);
+const faces = table([['Style', 'Used by', 'Files', 'Prompt for [hairstyle]'],
+  ...[...new Set([...HAIR_STYLES_M, ...HAIR_STYLES_F])].map((h) => [h, [HAIR_STYLES_M.includes(h) ? 'ATP' : '', HAIR_STYLES_F.includes(h) ? 'WTA' : ''].filter(Boolean).join(' · '),
+    h === 'bald' ? '—' : `hairFront/${h}.png${BACK.has(h) ? ` + hairBack/${h}.png` : ''}`, HAIR_DESC[h] ?? h]),
+]);
 
 const md = hand
   .replace('{{FACE_LAYERS}}', faces)
