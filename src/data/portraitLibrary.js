@@ -131,6 +131,5 @@ export function assignedPortrait(player){
 }
 // Tennis Stars: faces are procedural (src/career/faces.ts); the photo library stays for reference.
 export function portraitUrl(player){return player?faceUrl(player):'';}
-export function photoPortraitUrl(player){const assigned=assignedPortrait(player);return assigned?`${import.meta.env.BASE_URL}portraits-tennis/${assigned.asset.file}`:'';}
 export function portraitPresentation(player){const fame=Number(player?.fame)||0;return fame>=2200?'iconic':fame>=900?'famous':fame>=300?'known':'emerging';}
 export const PORTRAIT_LIBRARY_STATS={eliteAvailable:ELITE_PORTRAITS.length,standardAvailable:STANDARD_PORTRAITS.length,sourceSize:128,version:'0.6.6'};

@@ -52,7 +52,7 @@ const DEFS: DecisionDef[] = [
     make: () => ({
       id: 'press', title: 'Press conference', text: 'A journalist asks whether you believe you can win a Grand Slam one day.',
       options: [
-        { id: 'bold', label: '"I came here to win them all."', desc: '+8 fame, +2 confidence, but pressure: −2 Mentality this week… and a target on your back.', effects: { fame: 8, confidence: 2 } },
+        { id: 'bold', label: '"I came here to win them all."', desc: '+8 fame, +2 confidence, but the pressure costs 1 Mentality.', effects: { fame: 8, confidence: 2, skills: { mentality: -1 } } },
         { id: 'humble', label: '"One match at a time."', desc: '+1 Mentality.', effects: { skills: { mentality: 1 } } },
       ],
     }),

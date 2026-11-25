@@ -370,13 +370,13 @@ ${acc === 'cap' ? `<path d="M48 98 Q46 110 52 118 L56 102Z M152 98 Q154 110 148 
 ${L('accessory', acc, accessory(g))}
 </g></g></svg>`;
   if (!genes) cache.set(key, svg);
-  if (cache.size > 3000) cache.delete(cache.keys().next().value as string);
+  if (cache.size > 600) cache.delete(cache.keys().next().value as string);
   return svg;
 }
 const urlCache = new Map<string, string>();
 export function faceUrl(p: any, round = false) {
   const key = `${p?.id}|${p?.age}|${round}|${manifest ? Object.keys(manifest).length : 0}`;
   let u = urlCache.get(key);
-  if (!u) { u = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(faceSvg(p, { round }))}`; urlCache.set(key, u); if (urlCache.size > 3000) urlCache.delete(urlCache.keys().next().value as string); }
+  if (!u) { u = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(faceSvg(p, { round }))}`; urlCache.set(key, u); if (urlCache.size > 600) urlCache.delete(urlCache.keys().next().value as string); }
   return u;
 }

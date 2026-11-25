@@ -152,7 +152,7 @@ export type { CardDef };
 export const SLOT_ACTIVITIES: { kind: 'rest' | 'train' | 'sponsor' | 'media' | 'recovery' | 'video'; label: string; icon: string; desc: string }[] = [
   { kind: 'rest', label: 'Rest', icon: '🛌', desc: 'Recover fatigue and health.' },
   { kind: 'train', label: 'Training', icon: '🏋', desc: 'A third of a training week: pick a focus and an intensity.' },
-  { kind: 'recovery', label: 'Recovery session', icon: '🧊', desc: 'Ice, massage, physio: extra fatigue recovery. $150 (free with a physio).' },
+  { kind: 'recovery', label: 'Recovery session', icon: '🧊', desc: 'Ice, massage, physio: extra fatigue recovery, once a week (a second one counts as rest). $150 (free with a physio).' },
   { kind: 'video', label: 'Video study', icon: '📺', desc: 'Tactics and mentality grow a little. Light on the body.' },
   { kind: 'sponsor', label: 'Sponsor work', icon: '💼', desc: 'Shoots and appearances: money, a little fatigue. Pays more as you rise.' },
   { kind: 'media', label: 'Media day', icon: '🎙', desc: 'Interviews and social media: fame and a little confidence.' },

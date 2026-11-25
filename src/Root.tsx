@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { initStorage, listSlots, loadSlot, saveSlot, deleteSlot, storageAvailable, onStorageError, type SlotMeta } from './career/storage';
-import { loadMeta, saveMeta, creditCoins, buyUpgrade, openCrate, toggleEquip, type Meta } from './career/meta';
-import { buyPack, buyEquipment, createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
+import { loadMeta, saveMeta, creditCoins, buyUpgrade, openCrate, toggleEquip, META_KEY, type Meta } from './career/meta';
+import { CAREER_VERSION, buyPack, buyEquipment, createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
 import { migrateCareer } from './career/migrate';
 import { botDecision } from './career/bot';
 import { autoPlan } from './career/engine';
@@ -28,6 +28,8 @@ function App() {
   const [notice, setNotice] = useState('');
   const saving = useRef<Promise<void> | null>(null);
   const metaRef = useRef(meta); metaRef.current = meta;
+  // profile changes from a game action are saved together with the slot (see saveSlot)
+  const pendingMeta = useRef<Meta | null>(null);
 
   useEffect(() => { onStorageError((m) => setNotice(`⚠ ${m}`)); initStorage().then(async () => { setMeta(loadMeta()); setSlots(await listSlots()); setReady(true); }); }, []);
 
@@ -42,23 +44,40 @@ function App() {
       const p = me(next), k = p.career;
       m = { ...m, completed: m.completed + 1, history: [...m.history, { name: `${p.firstName} ${p.lastName}`, tour: c.tour, country: p.country, potential: c.potential, peak: k.peakRanking, titles: k.titles, majors: k.majors, grade: c.legacy?.grade ?? legacyScore(next).grade, coins: c.coinsTotal, endYear: next.year - 1, age: p.age }].slice(-60) };
     }
-    if (m !== metaRef.current) persistMeta(m);
+    if (m !== metaRef.current) { metaRef.current = m; setMeta(m); pendingMeta.current = m; }
     const copy = { ...next };
     setU(copy);
     return copy;
   };
-  const persist = async (next: any) => {
-    if (slot == null) return;
-    const run = async () => { try { await saveSlot(slot, next, slotMeta(next)); } catch { /* reported via onStorageError */ } };
+  const persist = async (next: any): Promise<boolean> => {
+    if (slot == null) return true;
+    let ok = true;
+    const run = async () => {
+      const m = pendingMeta.current;
+      try { await saveSlot(slot, next, slotMeta(next), m ? { [META_KEY]: JSON.stringify(m) } : {}); if (pendingMeta.current === m) pendingMeta.current = null; }
+      catch { ok = false; /* reported via onStorageError */ }
+    };
     saving.current = (saving.current ?? Promise.resolve()).then(run);
     await saving.current;
+    return ok;
   };
   const act = async (label: string, fn: (u: any) => void, { save = true }: { save?: boolean } = {}) => {
     if (!u || busy) return;
     setBusy(true); setNotice(label);
     await nextFrame();
-    try { fn(u); applySkills(u); const next = settle(u); if (save) await persist(next); setNotice(''); }
-    catch (e: any) { console.error(e); setNotice(`Something went wrong: ${e?.message ?? e}`); }
+    try {
+      fn(u); applySkills(u);
+      const next = settle(u);
+      if (save && !(await persist(next))) { setNotice('⚠ Not saved: browser storage is full or blocked. Free some space; progress since the last save will be lost if you close the game.'); return; }
+      setNotice('');
+    } catch (e: any) {
+      // the world may be half-updated: never save it, roll back to the last good save instead
+      console.error(e);
+      pendingMeta.current = null;
+      const back = slot != null ? await loadSlot(slot) : null;
+      if (back) { try { migrateCareer(back); setU(back); setMeta(loadMeta()); } catch { /* keep the in-memory state */ } }
+      setNotice(`Something went wrong (${e?.message ?? e}). ${back ? 'The week was rolled back to the last save.' : ''}`);
+    }
     finally { setBusy(false); }
   };
 
@@ -103,10 +122,23 @@ function App() {
         const next = createCareer({ ...setup, upgrades: meta.upgrades, trinkets: meta.equipped });
         persistMeta({ ...metaRef.current, careers: metaRef.current.careers + 1 });
         setSlot(n); setU(next); window.location.hash = '#/week';
-        await saveSlot(n, next, slotMeta(next)); setSlots(await listSlots());
-      } finally { setBusy(false); setNotice(''); }
+        let ok = true;
+        try { await saveSlot(n, next, slotMeta(next)); } catch { ok = false; }
+        setSlots(await listSlots());
+        setBusy(false); setNotice(ok ? '' : '⚠ Not saved: browser storage is full or blocked.');
+      } catch (e: any) { console.error(e); setBusy(false); setNotice(`Could not start the career (${e?.message ?? e}).`); }
     }}
-    onLoad={async (n) => { setBusy(true); try { const loaded = await loadSlot(n); if (loaded) { migrateCareer(loaded); setSlot(n); setU(loaded); window.location.hash = loaded.liveEvent ? '#/event' : '#/week'; } else setNotice('That save could not be loaded.'); } finally { setBusy(false); } }}
+    onLoad={async (n) => {
+      setBusy(true);
+      try {
+        const loaded = await loadSlot(n);
+        if (!loaded) { setNotice('That save could not be loaded.'); return; }
+        // never stamp a save from a newer build down to this version
+        if ((loaded.career?.version ?? 1) > CAREER_VERSION || (loaded.schemaVersion ?? 1) > 9) { setNotice('This save was made by a newer version of the game. Reload the page to update, then try again.'); return; }
+        migrateCareer(loaded); setSlot(n); setU(loaded); window.location.hash = loaded.liveEvent ? '#/event' : '#/week';
+      } catch (e: any) { console.error(e); setNotice(`That save could not be opened (${e?.message ?? e}). It has not been changed.`); }
+      finally { setBusy(false); }
+    }}
     onDelete={async (n) => { if (!window.confirm(`Delete career slot ${n}? This cannot be undone.`)) return; await deleteSlot(n); setSlots(await listSlots()); }}
     onBuy={(id) => { const m = buyUpgrade(meta, id); if (m) persistMeta(m); }}
     onCrate={async (id) => { const r = openCrate(meta, id); if (!r) return null; persistMeta(r.meta); return r.duplicate ? `${r.trinket}:dup` : r.trinket; }}

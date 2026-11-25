@@ -153,13 +153,15 @@ export function createCareer(setup: CareerSetup) {
   const weights = POTENTIAL_WEIGHTS.slice(0, maxTier + 1);
   let roll = rng.next() * weights.reduce((a, b) => a + b, 0), tier = 0;
   for (let i = 0; i < weights.length; i += 1) { roll -= weights[i]; if (roll <= 0) { tier = i; break; } }
-  tier = Math.max(tier, up.scouting ?? 0);
-  // trinkets lift the roll, but never past what the talent pool has unlocked (Generational is roll-only)
+  // trinkets lift the raw roll (never past what the talent pool has unlocked; Generational is roll-only),
+  // then Scouting sets a floor, so the two don't stack into a guaranteed top tier
   tier = Math.max(tier, Math.min(Math.min(maxTier, 4), tier + trinketFx.reduce((s, t) => s + (t.tier ?? 0), 0)));
+  tier = Math.max(tier, up.scouting ?? 0);
   if (setup.forceTier) tier = Math.max(0, POTENTIAL_TIERS.findIndex((t) => t.name === setup.forceTier));
   const T = POTENTIAL_TIERS[tier];
   const avg = rng.float(T.min, T.max);
-  const ceilBonus = trinketFx.reduce((s, t) => s + (t.ceiling ?? 0), 0) + ([0, 1, 2, 4][up.gifted ?? 0] ?? 0);
+  // meta ceiling bonuses (trinkets + Gifted) are capped so later runs stay a challenge
+  const ceilBonus = Math.min(META_CEILING_CAP, trinketFx.reduce((s, t) => s + (t.ceiling ?? 0), 0) + ([0, 1, 2, 4][up.gifted ?? 0] ?? 0));
   const styleBoost = STYLE_CEILING[setup.style] || {};
   const ceiling = {} as Skills, base = {} as Skills;
   // a new 15-year-old starts level with the other 15-year-olds of the same talent
@@ -333,10 +335,10 @@ function applyEffects(u: any, e: Effects): string[] {
   if (e.health) p.health = clamp((p.health || 0) + e.health, 30, 100);
   if (e.confidence) p.confidence = clamp((p.confidence || 0) + e.confidence, -10, 10);
   if (e.fame) addFame(p, e.fame);
-  for (const [k, v] of Object.entries(e.skills ?? {})) c.base[k as SkillKey] = clamp(r1(c.base[k as SkillKey] + (v as number)), 25, 100);
+  for (const [k, v] of Object.entries(e.skills ?? {})) { const key = k as SkillKey, d = v as number; c.base[key] = d > 0 ? Math.max(c.base[key], Math.min(c.ceiling[key], r1(c.base[key] + d))) : clamp(r1(c.base[key] + d), 25, 100); }
   for (const [k, v] of Object.entries(e.ceiling ?? {})) c.ceiling[k as SkillKey] = clamp(c.ceiling[k as SkillKey] + (v as number), 40, 99);
   for (const [k, v] of Object.entries(e.affinity ?? {})) p.surfaceAffinity[k] = clamp((p.surfaceAffinity[k] || 70) + (v as number), 40, 99);
-  for (const id of e.cards ?? []) addCard(c, id);
+  for (const id of e.cards ?? []) addCard(c, id, notes);
   for (const t of e.packs ?? []) c.packs.push(t);
   for (const [k, v] of Object.entries(e.staff ?? {})) c.staff[k as StaffKey] = clamp(v as number, 0, 3);
   if (e.partnerId !== undefined) setPartner(u, e.partnerId);
@@ -499,7 +501,7 @@ function matchExperience(c: Career, p: any, won: boolean, upset: boolean, rounds
     const gap = c.ceiling[k] - c.base[k];
     if (gap <= 0) continue;
     const w = k === 'mentality' || k === 'tactics' ? 2.2 : 1;
-    c.base[k] = r1Precise(c.base[k] + gap * 0.0024 * w * af * (won ? 1.15 : 1) * (upset ? 1.4 : 1) * Math.max(1, rounds * 0));
+    c.base[k] = r1Precise(c.base[k] + gap * 0.0024 * w * af * (won ? 1.15 : 1) * (upset ? 1.4 : 1));
   }
 }
 
@@ -614,8 +616,10 @@ export function finishWeek(u: any) {
 
   // the three slots of a week without a tournament
   if (slots) {
+    let recoveries = 0;
     for (const sl of slots) {
-      if (sl.kind === 'rest' || p.injury) {
+      const asRest = sl.kind === 'rest' || p.injury || (sl.kind === 'recovery' && (recoveries += 1) > 1);
+      if (asRest) {
         p.fatigue = clamp(p.fatigue - (14 + c.staff.physio * 5) / 3, 0, 100);
         p.health = clamp(p.health + (2 + c.staff.physio) / 3, 30, 100);
       } else if (sl.kind === 'train') train(c, p, sl.focus, sl.intensity, 1 / 3, rng, notes);
@@ -852,11 +856,20 @@ export function startNextSeason(u: any) {
   beginWeek(u);
 }
 
+// legacy points per title by level (Slams and Masters also score through majors/masters)
+const TITLE_SCORE: Record<string, number> = { ITF: 2, Challenger: 4, 'WTA 125': 4, '250': 10, '500': 16, '1000': 10, 'Grand Slam': 10, Finals: 25 };
+function titleScore(k: any) {
+  const by = k.titlesByLevel || {};
+  const counted = Object.values(by).reduce((a: number, b: any) => a + (b || 0), 0) as number;
+  const known = Object.entries(by).reduce((a, [lvl, n]) => a + (TITLE_SCORE[lvl] ?? 5) * ((n as number) || 0), 0);
+  return known + Math.max(0, (k.titles || 0) - counted) * 5; // titles from before titlesByLevel existed
+}
+export const META_CEILING_CAP = 8;
 export function legacyScore(u: any) {
   const p = me(u), c = careerOf(u), k = p.career;
   const peak = k.peakRanking || 999;
   const peakPts = peak === 1 ? 220 : peak <= 5 ? 150 : peak <= 10 ? 110 : peak <= 20 ? 75 : peak <= 50 ? 45 : peak <= 100 ? 25 : peak <= 200 ? 10 : 0;
-  const score = (k.majors || 0) * 130 + (k.masters || 0) * 30 + (k.titles || 0) * 7 + (k.weeksNo1 || 0) * 1.6 + peakPts + c.totalPrize / 250000 + (k.olympicGolds || 0) * 60 + (k.doublesMajors || 0) * 35;
+  const score = (k.majors || 0) * 130 + (k.masters || 0) * 30 + titleScore(k) + (k.weeksNo1 || 0) * 1.6 + peakPts + c.totalPrize / 250000 + (k.olympicGolds || 0) * 60 + (k.doublesMajors || 0) * 35;
   const grade = score >= 700 ? 'S' : score >= 320 ? 'A' : score >= 150 ? 'B' : score >= 60 ? 'C' : 'D';
   return { score: Math.round(score), grade };
 }
@@ -874,9 +887,15 @@ function retire(u: any) {
 // ---------------------------------------------------------------------------
 // Cards and packs
 // ---------------------------------------------------------------------------
-function addCard(c: Career, id: string) {
+function addCard(c: Career, id: string, notes?: string[]) {
   c.hand.push({ uid: `c${c.uid++}`, id });
-  while (c.hand.length > handLimit(c)) { const sold = c.hand.shift()!; c.money += CARD_SELL[CARD_MAP[sold.id]?.rarity ?? 'common']; }
+  while (c.hand.length > handLimit(c)) {
+    // hand full: sell the least valuable card (oldest first among equals), never silently the best one
+    const value = (h: { id: string }) => CARD_SELL[CARD_MAP[h.id]?.rarity ?? 'common'];
+    let i = 0; for (let j = 1; j < c.hand.length; j += 1) if (value(c.hand[j]) < value(c.hand[i])) i = j;
+    const [sold] = c.hand.splice(i, 1); const v = value(sold); c.money += v;
+    notes?.push(`Hand full: sold ${CARD_MAP[sold.id]?.name ?? 'a card'} (+$${v.toLocaleString('en-US')}).`);
+  }
 }
 export function openPack(u: any, index: number): string[] {
   const c = careerOf(u), p = me(u);

@@ -3,7 +3,7 @@ import { CRATES, DUPLICATE_REFUND, TRINKETS, TRINKET_RARITIES, UPGRADE_MAP, trin
 import type { CoinEvent } from './types';
 
 // Profile-wide progression that survives between careers.
-const META_KEY = 'meta';
+export const META_KEY = 'meta';
 
 export interface CareerRecord { name: string; tour: string; country: string; potential: string; peak: number; titles: number; majors: number; grade: string; coins: number; endYear: number; age: number }
 export interface Meta {

@@ -2,7 +2,7 @@
  * Storage for career saves and the legacy profile.
  *
  * All GitHub Pages games of this account share one origin and one ~5 MB
- * localStorage quota, which is usually full. Saves (15-40 MB worlds) live in
+ * localStorage quota, which is usually full. Saves (25-90 MB worlds) live in
  * IndexedDB only. The small profile is kept in IndexedDB too, with an
  * in-memory copy so reads stay synchronous. If IndexedDB is unavailable the
  * game still runs, but nothing persists (the UI warns about it).
@@ -59,19 +59,30 @@ export async function listSlots(): Promise<SlotMeta[]> {
 }
 function setMeta(rows: SlotMeta[]) { kvSet('slot-meta', JSON.stringify(rows.sort((a, b) => a.slot - b.slot))); }
 
-export async function saveSlot(slot: number, universe: any, meta: Omit<SlotMeta, 'slot' | 'updatedAt'>): Promise<void> {
+/**
+ * Saves a slot. The world, the slot list and any extra key/values (the legacy profile) are written in ONE
+ * transaction, so they commit together or not at all: the menu never shows progress that wasn't saved, and
+ * coins credited to the profile can't be credited again from an older slot.
+ */
+export async function saveSlot(slot: number, universe: any, meta: Omit<SlotMeta, 'slot' | 'updatedAt'>, extra: Record<string, string> = {}): Promise<void> {
   slotMem.set(slot, universe);
   const rows = (await listSlots()).filter((r) => r.slot !== slot);
   rows.push({ ...meta, slot, updatedAt: new Date().toISOString() });
-  setMeta(rows);
-  if (!db) return;
-  try { const tx = db.transaction(SLOTS, 'readwrite'); tx.objectStore(SLOTS).put(universe, slot); await done(tx); }
-  catch (e) { onError(describe(e)); throw e; }
+  const metaJson = JSON.stringify(rows.sort((a, b) => a.slot - b.slot));
+  if (!db) { kvMem.set('slot-meta', metaJson); for (const [k, v] of Object.entries(extra)) kvMem.set(k, v); return; }
+  try {
+    const tx = db.transaction([SLOTS, KV], 'readwrite');
+    tx.objectStore(SLOTS).put(universe, slot);
+    tx.objectStore(KV).put(metaJson, 'slot-meta');
+    for (const [k, v] of Object.entries(extra)) tx.objectStore(KV).put(v, k);
+    await done(tx);
+    kvMem.set('slot-meta', metaJson); for (const [k, v] of Object.entries(extra)) kvMem.set(k, v);
+  } catch (e) { onError(describe(e)); throw e; }
 }
 export async function loadSlot(slot: number): Promise<any | null> {
   if (!db) return slotMem.get(slot) ?? null;
   try { const tx = db.transaction(SLOTS, 'readonly'); return (await req(tx.objectStore(SLOTS).get(slot))) ?? null; }
-  catch (e) { onError(describe(e)); return null; }
+  catch (e) { console.error('loadSlot', e); onError(describe(e)); return null; }
 }
 export async function deleteSlot(slot: number): Promise<void> {
   slotMem.delete(slot);
