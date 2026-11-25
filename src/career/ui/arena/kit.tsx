@@ -10,7 +10,7 @@ export function installRipple() {
   rippleInstalled = true;
   document.addEventListener('pointerdown', (e) => {
     const t = (e.target as HTMLElement)?.closest?.('.ar button, .ar .ar-tap') as HTMLElement | null;
-    if (!t || (t as HTMLButtonElement).disabled) return;
+    if (!t || (t as HTMLButtonElement).disabled || t.classList.contains('ar-avatar')) return;
     const r = t.getBoundingClientRect();
     const s = document.createElement('span');
     const size = Math.max(r.width, r.height) * 1.4;
@@ -24,9 +24,9 @@ export function installRipple() {
 }
 
 /** Animate a number from its previous value to the new one. */
-export function useCountUp(value: number, ms = 700) {
-  const [shown, setShown] = useState(value);
-  const prev = useRef(value);
+export function useCountUp(value: number, ms = 700, start = value) {
+  const [shown, setShown] = useState(start);
+  const prev = useRef(start);
   useEffect(() => {
     const from = prev.current, to = value; prev.current = value;
     if (from === to || matchMedia('(prefers-reduced-motion: reduce)').matches) { setShown(to); return; }
@@ -37,8 +37,8 @@ export function useCountUp(value: number, ms = 700) {
   }, [value, ms]);
   return shown;
 }
-export function CountUp({ value, format = (n: number) => String(Math.round(n)) }: { value: number; format?: (n: number) => string }) {
-  const v = useCountUp(value);
+export function CountUp({ value, from = 0, format = (n: number) => String(Math.round(n)) }: { value: number; from?: number; format?: (n: number) => string }) {
+  const v = useCountUp(value, 700, from);
   return <>{format(v)}</>;
 }
 
@@ -101,9 +101,24 @@ export function Confetti({ count = 70, colors = ['#ff7a3d', '#ffd84a', '#3ee0cf'
 }
 
 export function ArModal({ title, kicker, onClose, children, actions, wide }: { title: React.ReactNode; kicker?: string; onClose?: () => void; children: React.ReactNode; actions?: React.ReactNode; wide?: boolean }) {
+  const card = useRef<HTMLDivElement>(null);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
+  useEffect(() => {
+    // focus the first control, trap Tab inside, give focus back on close
+    const prev = document.activeElement as HTMLElement | null;
+    const els = () => (card.current ? [...card.current.querySelectorAll<HTMLElement>('button:not(:disabled),select,input,[tabindex]')] : []);
+    (els().find((b) => !b.classList.contains('ar-x')) ?? els()[0])?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const l = els(); if (!l.length) return;
+      const f = l[0], z = l[l.length - 1];
+      if (e.shiftKey && document.activeElement === f) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); f.focus(); }
+    };
+    window.addEventListener('keydown', trap);
+    return () => { window.removeEventListener('keydown', trap); prev?.focus?.(); };
+  }, []);
   return <div className="ar-modal" role="dialog" aria-modal="true" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-    <div className={`ar-modal-card ${wide ? 'wide' : ''}`}>
+    <div ref={card} className={`ar-modal-card ${wide ? 'wide' : ''}`}>
       <header>{kicker && <small>{kicker}</small>}<h3>{title}</h3>{onClose && <button className="ar-x" onClick={onClose} aria-label="Close">✕</button>}</header>
       <div className="ar-modal-body">{children}</div>
       {actions && <footer>{actions}</footer>}

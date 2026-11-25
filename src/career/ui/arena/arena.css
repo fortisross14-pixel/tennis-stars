@@ -184,7 +184,8 @@
 .ar-empty{padding:40px;text-align:center;color:var(--ar-dim);font-family:var(--ar-head);font-size:22px}
 .ar-preview-tag{background:var(--ar-yellow);color:#1a1300;font-family:var(--ar-head);font-weight:900;font-size:13px;letter-spacing:.14em;padding:3px 9px;border-radius:6px}
 
-@media (prefers-reduced-motion:reduce){.ar *,.ar *::after{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){.ar::after,.ar *,.ar *::before,.ar *::after{animation:none!important;transition:none!important}.ar .ar-toast{animation:arToastRM 3.6s steps(1,end) forwards!important}}
+@keyframes arToastRM{to{opacity:0;visibility:hidden}}
 @media (max-width:640px){.ar-top{flex-wrap:wrap;padding:14px 16px 0}.ar-top-right{margin-left:0}.ar-tabs{margin:12px 16px 0}.ar-tabs button{padding:8px 14px;font-size:16px}.ar-stage,.ar-match{padding-left:16px;padding-right:16px}.ar-foot{padding:12px 16px}.ar-play{min-width:0;flex:1}.ar-hint.hide-sm{display:none}}
 
 /* spacing and small screens */
@@ -272,7 +273,7 @@
 /* modal */
 .ar-modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:16px;background:rgba(2,8,24,.65);backdrop-filter:blur(6px);animation:arFade .2s ease-out both}
 @keyframes arFade{from{opacity:0}to{opacity:1}}
-.ar-modal-card{width:min(620px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;border-radius:22px;border:1px solid var(--ar-line);background:linear-gradient(160deg,#123170,#081a44);box-shadow:0 30px 80px rgba(0,0,0,.6);animation:arPopIn .4s cubic-bezier(.2,1.3,.4,1) both;color:var(--ar-ink)}
+.ar-modal-card{width:min(620px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;border-radius:22px;border:1px solid var(--ar-line);background:linear-gradient(160deg,#123170,#081a44);box-shadow:0 30px 80px rgba(0,0,0,.6);animation:arPopIn .4s cubic-bezier(.2,1.3,.4,1) both;color:var(--ar-ink)}
 .ar-modal-card.wide{width:min(1000px,100%)}
 @keyframes arPopIn{from{opacity:0;transform:translateY(20px) scale(.94)}to{opacity:1;transform:none}}
 .ar-modal-card header{position:relative;padding:18px 22px 10px}
@@ -375,7 +376,7 @@
 @media (max-width:700px){.ar-live{padding:8px 12px 150px}.ar-bug-row{font-size:17px;gap:5px}.ar-bug-games{width:46px}.ar-bug-row img,.ar-bug-ph{width:32px;height:32px}.ar-bug-games{height:34px;font-size:22px}.ar-livecourt{min-height:340px}}
 
 /* fit the live court on short screens; compact result on tablets */
-.ar-lc-inner{width:min(300px,62vw,calc((100vh - 470px) * .53))}
+.ar-lc-inner{width:clamp(150px,calc((100dvh - 470px) * .53),min(300px,62vw))}
 .ar-livecourt{min-height:0;padding:22px 0 30px}
 @media (max-height:900px){.ar-live{gap:10px}.ar-bug-row{padding:4px 6px}.ar-bug-row img,.ar-bug-ph{width:34px;height:34px}.ar-bug-games{height:34px}}
 @media (max-height:900px) and (min-width:701px){.ar-result-banner h2{font-size:clamp(44px,6vw,80px)}.ar-row{padding:3px 0}.ar-compare{padding:12px 14px}}
@@ -454,3 +455,25 @@
 .mr-foot span{font-family:var(--ar-head);font-weight:700;color:var(--ar-dim);margin-right:auto}
 .mr-foot .ar-play{margin:0;min-width:200px;justify-content:center}
 @media (max-width:700px){.mr-skill{grid-template-columns:80px 1fr 50px 44px;gap:8px}.mr-list li{grid-template-columns:1fr auto;}.mr-lvl,.mr-list code{display:none}}
+
+/* audit fixes (game-ui-ux / game-feel skills) */
+.ar :focus-visible{outline:3px solid var(--ar-yellow);outline-offset:2px}
+.ar-search:focus-within{box-shadow:0 0 0 3px var(--ar-yellow)}
+.ar-event.focus{border-color:rgba(255,255,255,.7);box-shadow:0 0 0 3px rgba(255,255,255,.18)}
+.ar-foot{padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right))}
+@media (max-width:640px){.ar-foot{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+.mr{padding-left:max(22px,env(safe-area-inset-left));padding-right:max(22px,env(safe-area-inset-right))}
+.ar{padding-top:0}
+.ar-shell-top{padding-top:calc(12px + env(safe-area-inset-top))}
+@media (max-width:1180px){.ar-shell-top{padding-top:calc(10px + env(safe-area-inset-top))}}
+.ar-event.off{opacity:1;filter:none}
+.ar-event.off .ar-thumb,.ar-event.off strong{opacity:.6}
+.ar-pill-btn.live,.ar-tab-badge{background:#c8283a}
+.ar-dot.opp{background:transparent;border:3px solid var(--ar-teal)}
+.ar-x{width:46px;height:46px}
+.ar-legend,.ar-event small,.ar-slot p{font-size:14px}
+@media (hover:none){
+  .ar-tabs button:hover,.ar-secondary:hover,.ar-choice:hover,.ar-kinds button:hover,.ar-play:hover:not(:disabled),
+  .ar-skin .cs-card:hover,.ar .cs-slot:hover,.ar .cs-crates button:hover:not(:disabled),
+  .tc-card:hover .tc-frame,.tc-pack:hover .tc-pack-foil{transform:none}
+}

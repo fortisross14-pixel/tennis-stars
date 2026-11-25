@@ -59,7 +59,6 @@ export function ArenaLive({ match, me, opp, onDone }: { match: ViewerMatch; me: 
   const skipAll = () => { setSi(sets.length - 1); setGi(sets.at(-1)!.gameWinners.length); setSetBreak(false); };
   const [inner, outer] = COURT[match.surface] ?? COURT.Hard;
   const name = (p: any) => p ? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() : '—';
-  const lastWinner = gi > 0 ? cur.gameWinners[gi - 1] : null;
   // completed sets in the columns; the big box is the set in play
   const setScores = sets.map((s, i) => i < si || (i === si && (setBreak || done)) ? games(s, s.gameWinners.length) : null);
   const finishedSet = setBreak ? games(cur, total) : null;
@@ -72,11 +71,11 @@ export function ArenaLive({ match, me, opp, onDone }: { match: ViewerMatch; me: 
         <b className="ar-bug-name">{name(p)}</b>
         <i className={`ar-bug-serve ${nextServer === sideKey && !done && !setBreak ? 'on' : ''}`} title="Serving">●</i>
         {setScores.map((sc, i) => sc && <span key={i} className={`ar-bug-set ${i === si && !setBreak && !done ? 'cur' : ''} ${i < si || (i === si && (setBreak || done)) ? ((sc[side] > sc[1 - side]) ? 'w' : 'l') : ''}`}>{sc[side]}</span>)}
-        <strong className="ar-bug-games" key={`${si}-${gi}-${side}`}>{side ? gb : ga}</strong>
+        <strong className="ar-bug-games" key={`${si}-${side ? gb : ga}-${side}`}>{side ? gb : ga}</strong>
       </div>; })}
     </div>
 
-    <div className={`ar-livecourt ${lastWinner === 'A' ? 'pt-me' : lastWinner === 'B' ? 'pt-opp' : ''}`} style={{ ['--court' as any]: inner, ['--court-out' as any]: outer }}>
+    <div className={`ar-livecourt ${call && call.kind !== 'hold' ? (call.side === 'A' ? 'pt-me' : 'pt-opp') : ''}`} style={{ ['--court' as any]: inner, ['--court-out' as any]: outer }}>
       <div className="ar-lc-inner">
         <div className="ar-lc-court"><i className="ln base-t" /><i className="ln base-b" /><i className="ln side-l" /><i className="ln side-r" /><i className="ln svc-t" /><i className="ln svc-b" /><i className="ln center" /><i className="net" /></div>
         <span className="ar-lc-player opp">{opp?.id ? <img src={portraitUrl(opp)} alt="" /> : null}</span>
@@ -92,7 +91,7 @@ export function ArenaLive({ match, me, opp, onDone }: { match: ViewerMatch; me: 
       </div>}
     </div>
 
-    <div className="ar-strip">{sets.slice(0, si + 1).map((s, i) => <div key={i} className="ar-tl-row"><small>S{i + 1}</small>{s.gameWinners.slice(0, i < si ? s.gameWinners.length : gi).map((g, j) => { const tb = j === 12; const brk = !tb && s.servers[j] && s.servers[j] !== g; return <i key={j} className={`ar-dot ${g === 'A' ? 'me' : 'opp'} ${brk ? 'brk' : ''} ${tb ? 'tb' : ''}`} />; })}</div>)}</div>
+    <div className="ar-strip">{sets.slice(0, si + 1).map((s, i) => <div key={i} className="ar-tl-row"><small>S{i + 1}</small>{s.gameWinners.slice(0, i < si ? s.gameWinners.length : gi).map((g, j) => { const tb = j === 12; const brk = !tb && s.servers[j] && s.servers[j] !== g; return <i key={j} title={`Game ${j + 1}: ${g === 'A' ? 'your game' : 'their game'}${brk ? ' (break)' : ''}${tb ? ' (tie-break)' : ''}`} className={`ar-dot ${g === 'A' ? 'me' : 'opp'} ${brk ? 'brk' : ''} ${tb ? 'tb' : ''}`} />; })}</div>)}</div>
 
     <div className="ar-live-ctrl">
       {!done && !setBreak && <button className="ar-secondary" onClick={() => setPlaying((v) => !v)}>{playing ? '❚❚ Pause' : '▶ Resume'}</button>}

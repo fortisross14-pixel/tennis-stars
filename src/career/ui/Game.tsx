@@ -53,7 +53,7 @@ function SeasonReview({ u, busy, a }: { u: any; busy: boolean; a: GameActions })
     {great && <Confetti count={60} />}
     <div className="ar-title-strip big"><small>Season review</small><h2>{u.year} is over</h2></div>
     {s && <div className="ar-statgrid ar-stagger">
-      <div className="ar-stat"><span>Year-end ranking</span><strong>{s.rankEnd < 999 ? <>No. <CountUp value={s.rankEnd} /></> : '—'}</strong><small>best {s.bestRank < 999 ? `No. ${s.bestRank}` : '—'}</small></div>
+      <div className="ar-stat"><span>Year-end ranking</span><strong>{s.rankEnd < 999 ? <>No. <CountUp value={s.rankEnd} from={Math.min(999, s.rankEnd + 60)} /></> : '—'}</strong><small>best {s.bestRank < 999 ? `No. ${s.bestRank}` : '—'}</small></div>
       <div className="ar-stat"><span>Win–loss</span><strong><CountUp value={s.wins} />–<CountUp value={s.losses} /></strong></div>
       <div className="ar-stat"><span>Titles</span><strong><CountUp value={s.titles} /></strong><small>{s.titleNames.join(', ') || '—'}</small></div>
       <div className="ar-stat"><span>Prize money</span><strong><CountUp value={s.prize} format={money} /></strong></div>
@@ -155,14 +155,14 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
   const active = ['player', 'rivalry', 'match', 'tournament'].includes(pg) ? 'world' : ['event', 'replay'].includes(pg) ? 'week' : pg;
   const rec = replay ? c.matchLog.find((m) => m.id === replay) : null;
   const decisionOpen = c.decision && !u.seasonEnded && !c.retired && !c.monthReview;
-  return <div className="ar" role="application">
+  return <div className="ar">
     <header className="ar-shell-top">
       <button className="ar-brand" onClick={() => go('week')}><i>TS</i><span><b>Tennis Stars</b><small>{p.firstName} {p.lastName}</small></span></button>
       <ArTabs tabs={NAV} value={active as string} onChange={(k) => go(k)} badge={{ improve: c.packs.length || undefined } as any} />
       <div className="ar-shell-stats">
         {u.liveEvent && c.live && pg !== 'event' && <button className="ar-pill-btn live" onClick={() => go('event')}>● Live</button>}
         {busy && <span className="ar-pill-btn"><i className="ar-spin" /> {notice || 'Working…'}</span>}
-        <span className="ar-chip">💰 <b><CountUp value={c.money} format={money} /></b></span>
+        <span className="ar-chip">💰 <b><CountUp value={c.money} from={c.money} format={money} /></b></span>
         <span className="ar-chip mint">{monthOf(u.week)} <em>| {u.year}</em></span>
         <button className="ar-avatar ar-tap" onClick={() => go('overview')} title={`${ordinalRank(p.rankingPoints > 0 ? p.ranking : null)}${jr != null ? ` · junior No. ${jr}` : ''}`}><img src={portraitUrl(p)} alt="" /><span>{overall(p)}</span></button>
         <button className="ar-exit" onClick={a.exit}>Menu</button>

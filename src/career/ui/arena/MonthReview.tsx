@@ -24,7 +24,7 @@ export function MonthReview({ r, me, tour, onDone }: { r: MR; me: any; tour: str
   const slide = slides[i];
   const next = () => { haptic(); if (i + 1 >= slides.length) onDone(); else setI(i + 1); };
   useEffect(() => { if (paused) return; const t = setTimeout(next, slide === 'title' ? 2000 : AUTO_MS); return () => clearTimeout(t); }, [i, paused]);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onDone(); else if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(); } else if (e.key === 'ArrowLeft') setI(Math.max(0, i - 1)); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); });
+  useEffect(() => { const k = (e: KeyboardEvent) => { const tg = e.target as HTMLElement; if ((e.key === 'Enter' || e.key === ' ') && tg?.closest?.('button')) return; if (e.key === 'Escape') onDone(); else if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(); } else if (e.key === 'ArrowLeft') setI(Math.max(0, i - 1)); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); });
   const rankFrom = r.from.ranked ? r.from.rank : null, rankTo = r.to.ranked ? r.to.rank : null;
   const moved = rankFrom && rankTo ? rankFrom - rankTo : rankTo ? 1 : 0;
   const jrMoved = r.from.juniorRank && r.to.juniorRank ? r.from.juniorRank - r.to.juniorRank : 0;
@@ -33,7 +33,7 @@ export function MonthReview({ r, me, tour, onDone }: { r: MR; me: any; tour: str
 
   return <div className="mr" role="dialog" aria-modal="true" aria-label={`${r.label} in review`} onPointerUp={(e) => { if ((e.target as HTMLElement).closest('button')) return; next(); }}>
     <div className="mr-progress">{slides.map((s, j) => <i key={s} className={j < i ? 'done' : j === i ? (paused ? 'now paused' : 'now') : ''} style={j === i ? { animationDuration: `${slide === 'title' ? 2000 : AUTO_MS}ms` } : undefined} />)}</div>
-    <div className="mr-top"><small>Month in review</small><button className="mr-skip" onClick={(e) => { e.stopPropagation(); setPaused((p) => !p); }}>{paused ? '▶' : '❚❚'}</button><button className="mr-skip" onClick={(e) => { e.stopPropagation(); onDone(); }}>Skip</button></div>
+    <div className="mr-top"><small>Month in review</small><button className="mr-skip" aria-label={paused ? 'Resume' : 'Pause'} onClick={(e) => { e.stopPropagation(); setPaused((p) => !p); }}>{paused ? '▶' : '❚❚'}</button><button className="mr-skip" onClick={(e) => { e.stopPropagation(); onDone(); }}>Skip</button></div>
 
     <div className="mr-stage" key={slide}>
       {slide === 'title' && <div className="mr-title">
@@ -54,14 +54,14 @@ export function MonthReview({ r, me, tour, onDone }: { r: MR; me: any; tour: str
 
       {slide === 'ranking' && <div className="mr-block center">
         <h3>World ranking</h3>
-        <div className="mr-rank"><span className="from">{rankFrom ? `No. ${rankFrom}` : 'Unranked'}</span><i>→</i><b className={moved > 0 ? 'up' : moved < 0 ? 'down' : ''}>{rankTo ? <>No. <CountUp value={rankTo} /></> : 'Unranked'}</b></div>
+        <div className="mr-rank"><span className="from">{rankFrom ? `No. ${rankFrom}` : 'Unranked'}</span><i>→</i><b className={moved > 0 ? 'up' : moved < 0 ? 'down' : ''}>{rankTo ? <>No. <CountUp value={rankTo} from={rankFrom || rankTo} /></> : 'Unranked'}</b></div>
         {moved !== 0 && rankTo && <div className={`mr-delta ${moved > 0 ? 'up' : 'down'}`}>{moved > 0 ? '▲' : '▼'} {Math.abs(moved)} places</div>}
         {r.to.juniorRank != null && <p className="mr-note">Junior ranking: No. {r.from.juniorRank ?? '—'} → <b>No. {r.to.juniorRank}</b>{jrMoved ? ` (${jrMoved > 0 ? '▲' : '▼'}${Math.abs(jrMoved)})` : ''}</p>}
       </div>}
 
       {slide === 'skills' && <div className="mr-block">
         <h3>Improvement</h3>
-        <div className="mr-ovr"><span>Overall</span><b>{r.from.ovr}</b><i>→</i><b className="to"><CountUp value={r.to.ovr} /></b></div>
+        <div className="mr-ovr"><span>Overall</span><b>{r.from.ovr}</b><i>→</i><b className="to"><CountUp value={r.to.ovr} from={r.from.ovr} /></b></div>
         <div className="mr-skills">{SKILLS.filter((s) => r.skillDelta[s.key]).map((s, j) => { const a = r.from.base[s.key], b = r.to.base[s.key]; const d = r.skillDelta[s.key]!; return <div key={s.key} className="mr-skill" style={{ animationDelay: `${j * 90}ms` }}>
           <span>{s.label}</span>
           <div className="mr-bar"><i className="old" style={{ width: `${Math.min(a, b)}%` }} /><i className={`gain ${d < 0 ? 'neg' : ''}`} style={{ left: `${Math.min(a, b)}%`, width: `${Math.abs(b - a)}%`, animationDelay: `${300 + j * 90}ms` }} /></div>
@@ -85,6 +85,6 @@ export function MonthReview({ r, me, tour, onDone }: { r: MR; me: any; tour: str
       </div>}
     </div>
 
-    <div className="mr-foot"><span>{i + 1} / {slides.length}</span><button className="ar-play" onClick={(e) => { e.stopPropagation(); next(); }}>{i + 1 >= slides.length ? 'Continue' : 'Next'}</button></div>
+    <div className="mr-foot"><span>{i + 1} / {slides.length}</span><button className="ar-play" autoFocus onClick={(e) => { e.stopPropagation(); next(); }}>{i + 1 >= slides.length ? 'Continue' : 'Next'}</button></div>
   </div>;
 }

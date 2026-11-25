@@ -305,3 +305,9 @@
 .tc-reveal-row .tc-card.r-legendary{animation:tcFlip .8s cubic-bezier(.2,.9,.3,1.25) both,arShake .5s ease-in-out 1.6s}
 .tc-reveal-done{margin:0;min-width:240px;justify-content:center}
 .ar-skin .player-link{font-size:inherit!important;font-family:var(--ar-body)}
+
+/* audit fixes: touch targets and readable gameplay text */
+.tc-actions button{min-height:46px}
+.ar-search input{min-height:44px}
+.tc-err{font-size:14px}
+.tc-desc{font-size:13px}

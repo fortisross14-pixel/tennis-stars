@@ -66,7 +66,8 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit, onAuto, extraTabs }
   useSwipe(stageRef, () => setTab('training'), () => setTab('tournaments'));
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'SELECT') return;
+      if (document.querySelector('.mr, .ar-modal, .cs-modal, .tc-reveal')) return; const tg = e.target as HTMLElement; if ((e.key === 'Enter' || e.key === ' ') && tg?.closest?.('button,a,input,select,textarea')) return;
+      if (tg?.tagName === 'SELECT') return;
       if (e.key === 'q' || e.key === 'Q') setTab('tournaments');
       else if (e.key === 'e' || e.key === 'E') setTab('training');
       else if (e.key === 'Enter' && !busy && !c.decision) onPlay();
@@ -128,7 +129,7 @@ export function ArenaWeek({ u, busy, onPlan, onPlay, onExit, onAuto, extraTabs }
             </div>
           </div>
           <div className="ar-panel ar-energy"><em>Energy</em> 💛 {energy}%<span className="sep" /><em>Health</em> ➕ {p.injury ? p.injury.type : 'No injury'}<span className="sep" /><em>Form</em> {p.confidence >= 2 ? '🔥 Hot' : p.confidence <= -2 ? '🥶 Cold' : '😐 Steady'}</div>
-        </> : <div className="ar-panel ar-empty">Hover an event to see the details.</div>}
+        </> : <div className="ar-panel ar-empty">Tap an event to see the details.</div>}
       </section>
     </div> : <div className="ar-stage" style={{ gridTemplateColumns: '1fr' }}>
       {sel && <div className="ar-panel ar-empty ar-in-up" style={{ padding: 18 }}>You are entered in a tournament this week. <button className="ar-secondary" onClick={() => onPlan({ kind: 'slots', slots })}>Withdraw and train instead</button></div>}

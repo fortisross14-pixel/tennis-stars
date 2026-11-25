@@ -85,7 +85,7 @@ export function ArenaMatch({ u, busy, onLive, onExit, onContinue, recordId, onPl
   const play = async () => { if (!pre) { haptic(14); setPhase('live'); return; } haptic(14); setJustPlayed({ eventId: c.live!.eventId, round }); await onLive('slot', mySlot); setPhase('live'); };
 
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onExit(); else if (e.key === 'Enter' && !busy) { if (phase === 'intro') void play(); else if (phase === 'result') onContinue(); } else if ((e.key === 'w' || e.key === 'W') && result.rec && phase === 'result') setPhase('live'); };
+    const k = (e: KeyboardEvent) => { if (document.querySelector('.mr, .ar-modal, .cs-modal, .tc-reveal')) return; const tg = e.target as HTMLElement; if ((e.key === 'Enter' || e.key === ' ') && tg?.closest?.('button,a,input,select,textarea')) return; if (e.key === 'Escape') onExit(); else if (e.key === 'Enter' && !busy) { if (phase === 'intro') void play(); else if (phase === 'result') onContinue(); } else if ((e.key === 'w' || e.key === 'W') && result.rec && phase === 'result') setPhase('live'); };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   });
 
@@ -125,7 +125,7 @@ export function ArenaMatch({ u, busy, onLive, onExit, onContinue, recordId, onPl
         {phase === 'result' && sets.length > 0 && <section className="ar-panel ar-timeline ar-in-up">
           <h4>Game by game</h4>
           {sets.map((s, i) => <div key={i} className="ar-tl-row"><small>S{i + 1}</small>{s.gameWinners.map((g, j) => { const tb = j === 12; const brk = !tb && s.servers[j] && s.servers[j] !== g; return <i key={j} title={`Game ${j + 1}${tb ? ' · tie-break' : brk ? ' · break' : ''}`} className={`ar-dot ${g === 'A' ? 'me' : 'opp'} ${brk ? 'brk' : ''} ${tb ? 'tb' : ''}`} style={{ animationDelay: `${300 + (i * 13 + j) * 25}ms` }} />; })}</div>)}
-          <div className="ar-legend"><span><i style={{ background: 'var(--ar-orange)' }} />your game</span><span><i style={{ background: 'var(--ar-teal)' }} />their game</span><span><i style={{ boxShadow: '0 0 0 3px var(--ar-yellow)', background: 'transparent' }} />break of serve</span><span>◆ tie-break</span></div>
+          <div className="ar-legend"><span><i style={{ background: 'var(--ar-orange)' }} />your game</span><span><i style={{ border: '3px solid var(--ar-teal)', background: 'transparent' }} />their game</span><span><i style={{ boxShadow: '0 0 0 3px var(--ar-yellow)', background: 'transparent' }} />break of serve</span><span>◆ tie-break</span></div>
         </section>}
       </div>
       <Fighter p={opp} side="opp" isMe={false} rank={rk(opp)} race={race(u.players[c.tour], opp)} state={phase !== 'result' ? undefined : won ? 'lost' : 'won'} />

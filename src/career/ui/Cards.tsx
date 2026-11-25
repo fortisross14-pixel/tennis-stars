@@ -104,7 +104,7 @@ export function Cards({ u, busy, onOpen, onMerge, onPlay, onSell }: { u: any; bu
       <div className={`tc-burst r-${best}`} style={{ ['--pc' as any]: PACKS[reveal.tier].color }} />
       <h3>{PACKS[reveal.tier].name}</h3>
       <div className="tc-reveal-row">{reveal.cards.map((id, i) => <CardView key={i} id={id} delay={300 + i * 280} />)}</div>
-      <button className="ar-play tc-reveal-done" onClick={() => setReveal(null)}>Add to hand</button>
+      <button className="ar-play tc-reveal-done" autoFocus onClick={() => setReveal(null)}>Add to hand</button>
     </div>}
   </div>;
 }
