@@ -27,6 +27,8 @@ function chips(d: CardDef): string[] {
   for (const [k, v] of Object.entries(d.ceiling ?? {})) out.push(`+${v} POT ${SHORT[k] ?? k}`);
   if (d.ceilingRandom) out.push(`+${d.ceilingRandom} POT ?`);
   if (d.edge) out.push(`+${d.edge} EDGE`);
+  if (d.matchEdge) out.push(`+${d.matchEdge} EDGE ${d.setPick ? '1 SET' : 'MATCH'}`);
+  if (d.kind === 'match' && d.confidence) out.push(`+${d.confidence} MORALE`);
   if (d.fatigue) out.push(`${d.fatigue > 0 ? '+' : ''}${d.fatigue} FAT`);
   if (d.heal) out.push(d.heal >= 99 ? 'HEAL' : `−${d.heal} WK INJ`);
   if (d.money) out.push(`+${money(d.money)}`);
@@ -95,8 +97,8 @@ export function Cards({ u, busy, onOpen, onMerge, onPlay, onSell }: { u: any; bu
     <section className="cs-panel">
       <div className="cs-title-row"><h2>Your hand</h2><span className="muted">{c.hand.length}/{handLimit(c)} · extra cards are sold automatically</span></div>
       {!c.hand.length && <p className="muted">Open packs to fill your hand.</p>}
-      <div className="tc-hand">{sorted.map((h, i) => { const err = canPlay(u, h.uid); const d = CARD_MAP[h.id]; return <CardView key={h.uid} id={h.id} dim={!!err} delay={i * 40}>
-        <div className="tc-actions"><button className="tc-play" disabled={busy || !!err} onClick={() => { haptic(14); onPlay(h.uid); }}>Play</button><button className="tc-sell" disabled={busy} onClick={() => onSell(h.uid)}>Sell {money(CARD_SELL[d.rarity])}</button></div>
+      <div className="tc-hand">{sorted.map((h, i) => { const d = CARD_MAP[h.id]; const isMatch = d?.kind === 'match'; const err = isMatch ? null : canPlay(u, h.uid); return <CardView key={h.uid} id={h.id} dim={!!err} delay={i * 40}>
+        <div className="tc-actions">{isMatch ? <span className="tc-matchnote">🎾 Take it into a tournament</span> : <button className="tc-play" disabled={busy || !!err} onClick={() => { haptic(14); onPlay(h.uid); }}>Play</button>}<button className="tc-sell" disabled={busy} onClick={() => onSell(h.uid)}>Sell {money(CARD_SELL[d.rarity])}</button></div>
         {err && <small className="tc-err">{err}</small>}
       </CardView>; })}</div>
     </section>

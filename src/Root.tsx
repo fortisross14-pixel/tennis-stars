@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { initStorage, listSlots, loadSlot, saveSlot, deleteSlot, storageAvailable, onStorageError, type SlotMeta } from './career/storage';
 import { loadMeta, saveMeta, creditCoins, buyUpgrade, openCrate, toggleEquip, META_KEY, type Meta } from './career/meta';
-import { CAREER_VERSION, buyPack, buyEquipment, createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
+import { CAREER_VERSION, setLoadout, queueMatchCard, buyPack, buyEquipment, createCareer, careerOf, me, playWeek, careerLive, finishLiveEvent, resolveDecision, openPack, mergePacks, playCard, sellCard, setStaff, setPartner, startNextSeason, weekKeyOf, legacyScore, applySkills } from './career/engine';
 import { migrateCareer } from './career/migrate';
 import { botDecision } from './career/bot';
 import { autoPlan } from './career/engine';
@@ -107,6 +107,8 @@ function App() {
     partner: (id) => act('Updating doubles…', (x) => setPartner(x, id)),
     setPlan: (week, plan) => { const c = careerOf(u); const key = weekKeyOf(u.year, week); if (week === u.week) { if (plan) c.current = plan; } else if (plan) c.plan[key] = plan; else delete c.plan[key]; settle(u); },
     buyPack: (t) => act('Buying…', (x) => { const err = buyPack(x, t); setTimeout(() => setNotice(err ?? 'Pack added to Cards.'), 30); }),
+    loadout: (uids) => act('Packing your bag…', (x) => { const err = setLoadout(x, uids); if (err) setTimeout(() => setNotice(err), 30); }),
+    queueCard: (uid, set = -1) => act('…', (x) => { const err = queueMatchCard(x, uid, set); if (err) setTimeout(() => setNotice(err), 30); }),
     buyEquipment: (id) => act('Buying…', (x) => { const err = buyEquipment(x, id); if (err) setTimeout(() => setNotice(err), 30); }),
     nextSeason: () => act('Opening the new season…', (x) => startNextSeason(x)),
     retireNow: () => act('Announcing your retirement…', (x) => { careerOf(x).counters.retire = 1; startNextSeason(x); }),

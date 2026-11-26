@@ -16,6 +16,7 @@ const DEFAULTS: Partial<Career> = {
   retired: false, legacy: null, uid: 1,
   matchLog: [], tournamentLog: [], unlocks: [], skillLog: [], equipment: [], watched: {},
   monthStart: null, monthReview: null,
+  liveCards: [], liveLocked: false, matchCard: null, liveNotes: [],
 };
 
 export function migrateCareer(u: any) {

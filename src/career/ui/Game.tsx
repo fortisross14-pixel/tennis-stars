@@ -30,6 +30,7 @@ export interface GameActions {
   openPack: (i: number) => Promise<string[]>; mergePacks: (t: PackTier) => void; playCard: (uid: string) => void; sellCard: (uid: string) => void;
   staff: (k: StaffKey, lvl: number) => void; partner: (id: string | null) => void; setPlan: (week: number, plan: WeekPlan | null) => void;
   buyPack: (t: PackTier) => void; buyEquipment: (id: string) => void;
+  loadout: (uids: string[]) => void; queueCard: (uid: string | null, set?: number) => void;
   nextSeason: () => void; retireNow: () => void; exit: () => void; save: () => void;
 }
 
@@ -123,7 +124,7 @@ export function Game({ u, busy, notice, a }: { u: any; busy: boolean; notice: st
       if (u.liveEvent && c.live) { const st = liveState(u, c.live.eventId); if (st?.exitRound?.[p.id] || st?.done) await a.finishEvent(); else await a.live('to-my-match'); setArenaKey((k) => k + 1); }
       else go('week');
     };
-    page = <ArenaMatch key={`${arenaKey}-${sub}`} u={u} busy={busy} onLive={a.live} onExit={() => go('week')} onContinue={cont} recordId={recordId} onPlayer={onPlayer} />;
+    page = <ArenaMatch key={`${arenaKey}-${sub}`} u={u} busy={busy} onLive={a.live} onExit={() => go('week')} onContinue={cont} recordId={recordId} onPlayer={onPlayer} onLoadout={a.loadout} onQueue={a.queueCard} />;
   }
   else if (pg === 'overview') page = <div className="ar-skin ar-pad-page"><Overview u={u} onOpenTournament={onTournament} go={go} /></div>;
   else if (pg === 'career') page = <div className="ar-skin ar-pad-page"><CareerTab u={u} sub={sub} go={go} onWatch={(id) => go('replay', id)} onPlayer={onPlayer} onTournament={onTournament} /></div>;

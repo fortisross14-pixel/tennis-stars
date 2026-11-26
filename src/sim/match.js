@@ -136,6 +136,8 @@ export function specialEdge(player, opponent, surface, setIndex = 0, bestOf = 3,
   if (has('big-stage') && event && ['Grand Slam', '1000', 'Finals', 'Olympics'].includes(event.level) && ['QF', 'SF', 'F'].includes(round)) edge += 2.4;
   if (has('home-hero') && event?.country && event.country === player.country) edge += 2.4;
   if (has('qualifier-grit') && event && ['ITF', 'Challenger', 'WTA 125', '250'].includes(event.level) && (opponent?.ranking || 999) < (player.ranking || 999)) edge += 1.4;
+  // career hook: a match card played for this match (one set, or the whole match when set is -1)
+  const mb = player.matchBoost; if (mb && (mb.set < 0 || mb.set === setIndex)) edge += Number(mb.edge) || 0;
   return edge + (Number(player.boostEdge) || 0);
 }
 
@@ -155,7 +157,7 @@ export function effectiveStrength(player, opponent, surface, setIndex = 0, bestO
   const rarityEdge = player.controlled ? 0 : (RARITY_MATCH_EDGE[player.rarity] || 0);
   const form = formEdge(player);
   const persona = ctx ? personalityEdge(player, opponent, ctx) : 0;
-  const special = (player.specials?.length || player.boostEdge) ? specialEdge(player, opponent, surface, setIndex, bestOf, ctx) : 0;
+  const special = (player.specials?.length || player.boostEdge || player.matchBoost) ? specialEdge(player, opponent, surface, setIndex, bestOf, ctx) : 0;
   return skill + affinity + preferredSurfaceBonus + surfaceStyleSynergy + style + counter + shape + health + lateSetEndurance + mentality + tactics + rarityEdge + form + persona + special - fatiguePenalty;
 }
 

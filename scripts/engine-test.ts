@@ -31,7 +31,10 @@ while (weeks++ < 12 && !lived) {
 }
 assert.ok(lived, 'played a live tournament');
 // cards
-c.packs.push('gold'); const got = openPack(u, c.packs.length - 1); assert.equal(got.length, 4);
+c.packs.push('gold'); const got = openPack(u, c.packs.length - 1); assert.ok(got.length === 4 || got.length === 5, 'pack: 4 cards + maybe a match card');
+// match cards are only used inside a tournament
+c.hand.push({ uid: 'mc-test', id: 'mc-magic' }); assert.ok(canPlay(u, 'mc-test'), 'match card cannot be played from the hand');
+c.hand = c.hand.filter((h) => h.uid !== 'mc-test');
 c.cardPlays = 3; const playable = c.hand.find((h) => !canPlay(u, h.uid)); if (playable) playCard(u, playable.uid);
 c.money = 1e6; assert.equal(setStaff(u, 'coach', 2), null);
 const partner = partnerCandidates(u).find((x: any) => x.willing); if (partner) { setPartner(u, partner.player.id); assert.ok(u.doublesTeams.ATP.some((t: any) => t.career)); }

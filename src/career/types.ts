@@ -117,6 +117,10 @@ export interface Career {
   watchMatches: boolean;
   decision: Decision | null;
   live: { eventId: string } | null;
+  liveCards: CardInstance[];        // match cards taken into the current tournament (up to 3)
+  liveLocked: boolean;              // the loadout locks once your first match is played
+  matchCard: { uid: string; set: number } | null;   // queued for your next match (set: 0-based, -1 = whole match)
+  liveNotes: string[];              // what happened with cards, stamina and morale in this tournament
   pendingWeek: { plan: WeekPlan; rankBefore: number; juniorRankBefore: number | null; base: Skills; money: number; year: number; week: number; age: number; entryNote?: string } | null;
   lastReport: WeekReport | null;
   reports: WeekReport[];

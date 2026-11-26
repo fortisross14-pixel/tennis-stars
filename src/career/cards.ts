@@ -1,6 +1,6 @@
 import type { Rarity, SkillKey, Skills } from './types';
 
-export type CardKind = 'drill' | 'boost' | 'recovery' | 'potential' | 'special' | 'money' | 'wildcard';
+export type CardKind = 'drill' | 'boost' | 'recovery' | 'potential' | 'special' | 'money' | 'wildcard' | 'match';
 export interface CardDef {
   id: string; name: string; kind: CardKind; rarity: Rarity; desc: string; icon: string;
   skills?: Partial<Skills>;          // drill: permanent; boost: for the week
@@ -13,6 +13,8 @@ export interface CardDef {
   ceilingRandom?: number;
   fatigue?: number; health?: number; heal?: number; confidence?: number;
   money?: number; special?: string; wildcard?: number;
+  matchEdge?: number;               // match card: edge for one set (setPick) or the whole match
+  setPick?: boolean;                // match card: you choose the set it fires in
 }
 
 const CARDS: CardDef[] = [];
@@ -74,7 +76,22 @@ CARDS.push(
   { id: 'wc-director', name: "Director's Favour", kind: 'wildcard', rarity: 'epic', icon: '🎟', desc: 'Two guaranteed wildcards (any event below Slams).', wildcard: 2 },
 );
 
+// Match cards: taken into a tournament (up to 3) and used one per match, before you play it.
+CARDS.push(
+  { id: 'mc-towel', name: 'Towel & Banana', kind: 'match', rarity: 'common', icon: '🍌', desc: 'Refuel at the changeover: −10 fatigue before the match.', fatigue: -10 },
+  { id: 'mc-fans', name: 'Fan Connection', kind: 'match', rarity: 'common', icon: '🙌', desc: 'The crowd is with you: +2 morale and +3 edge in the set you pick.', confidence: 2, matchEdge: 3, setPick: true },
+  { id: 'mc-speech', name: 'Inspirational Speech', kind: 'match', rarity: 'uncommon', icon: '📣', desc: 'Your coach fires you up: +4 morale and +1 edge for the match.', confidence: 4, matchEdge: 1 },
+  { id: 'mc-timeout', name: 'Tactical Plan', kind: 'match', rarity: 'uncommon', icon: '📋', desc: 'A plan for one set: +5 edge in the set you pick.', matchEdge: 5, setPick: true },
+  { id: 'mc-legs', name: 'Fresh Legs', kind: 'match', rarity: 'rare', icon: '🦵', desc: '−20 fatigue and +2 edge for the match.', fatigue: -20, matchEdge: 2 },
+  { id: 'mc-magic', name: 'Magic Set', kind: 'match', rarity: 'rare', icon: '✨', desc: 'Everything clicks: +8 edge in the set you pick.', matchEdge: 8, setPick: true },
+  { id: 'mc-crowd', name: 'Crowd Roar', kind: 'match', rarity: 'epic', icon: '🏟', desc: '+4 morale, −10 fatigue and +8 edge in the set you pick.', confidence: 4, fatigue: -10, matchEdge: 8, setPick: true },
+  { id: 'mc-flow', name: 'Flow State', kind: 'match', rarity: 'epic', icon: '🌊', desc: '+5 edge for the whole match.', matchEdge: 5 },
+  { id: 'mc-aura', name: "Champion's Aura", kind: 'match', rarity: 'legendary', icon: '👑', desc: '+7 edge for the whole match, +5 morale and −15 fatigue.', matchEdge: 7, confidence: 5, fatigue: -15 },
+);
+export const MATCH_CARD_CHANCE: Record<string, number> = { bronze: .55, silver: .75, gold: .9, elite: 1 };
+export const LOADOUT_SIZE = 3;
+
 export const CARD_LIST = CARDS;
 export const CARD_MAP: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 export const CARD_SELL: Record<Rarity, number> = { common: 300, uncommon: 800, rare: 2000, epic: 5000, legendary: 12000 };
-export const KIND_LABEL: Record<CardKind, string> = { drill: 'Training', boost: 'Boost', recovery: 'Recovery', potential: 'Potential', special: 'Special skill', money: 'Money', wildcard: 'Wildcard' };
+export const KIND_LABEL: Record<CardKind, string> = { drill: 'Training', boost: 'Boost', recovery: 'Recovery', potential: 'Potential', special: 'Special skill', money: 'Money', wildcard: 'Wildcard', match: 'Match card' };

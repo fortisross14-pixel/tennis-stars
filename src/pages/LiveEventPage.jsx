@@ -48,7 +48,7 @@ function entryTag(state,id){const t=state.entryMeta?.find(m=>m.id===id)?.type;re
 function PlayerLine({universe,state,id,winnerId,score,onPlayer,align='left'}){
   const p=findPlayer(universe,id);if(!p)return <span className="lv-tbd">TBD</span>;
   const seed=seedOf(state,id),tag=entryTag(state,id);
-  const cls=winnerId?(winnerId===id?'lv-line won':'lv-line lost'):'lv-line';
+  const cls=(winnerId?(winnerId===id?'lv-line won':'lv-line lost'):'lv-line')+(p.controlled?' me':'');
   return <button className={`${cls} ${align}`} onClick={()=>onPlayer?.(id)}><Flag code={p.country}/><span className="lv-name">{fullName(p)}</span>{seed&&<em className="lv-seed">[{seed}]</em>}{tag&&<em className="lv-tag">{tag}</em>}{score&&<b>{score}</b>}</button>;
 }
 function TeamLine({country,winner}){return <span className={`lv-line ${winner?(winner===country?'won':'lost'):''}`}><Flag code={country}/><span className="lv-name">{country}</span></span>;}
@@ -122,8 +122,9 @@ export function RoundMatches({universe,state,r,featured,onWatch,onQuick,onPlayer
     </article>;})}</div>;
 }
 
-export function Bracket({universe,state,onPlayer}){
-  const from=Math.max(0,state.rounds.findIndex(r=>r==='QF'));
+export function Bracket({universe,state,onPlayer,full=false}){
+  // career hook: `full` shows the whole draw from the first round
+  const from=full?0:Math.max(0,state.rounds.findIndex(r=>r==='QF'));
   const cols=state.rounds.slice(from).map((round,k)=>({round,r:from+k}));
   const champ=state.kind==='team'?state.championCountry:state.championId;
   return <div className="lv-bracket">{cols.map(({round,r})=>{const pairs=pairsForRound(state,r)||new Array(Math.max(1,2**(state.rounds.length-r-1))).fill([null,null]);return <div className="lv-bracket-col" key={round}><h4>{ROUND_SHORT[round]||round}</h4><div className="lv-bracket-stack">{pairs.map(([a,b],slot)=>{const m=a&&b?matchForPair(state,round,a,b,slot):null;const w=state.kind==='team'?m?.winner:m?.winnerId;return <div className="lv-bracket-cell" key={slot}>{state.kind==='team'?<>{a?<TeamLine country={a} winner={w}/>:<span className="lv-tbd">TBD</span>}{b?<TeamLine country={b} winner={w}/>:<span className="lv-tbd">TBD</span>}</>:<>{a?<PlayerLine universe={universe} state={state} id={a} winnerId={w} onPlayer={onPlayer}/>:<span className="lv-tbd">TBD</span>}{b?<PlayerLine universe={universe} state={state} id={b} winnerId={w} onPlayer={onPlayer}/>:<span className="lv-tbd">TBD</span>}</>}{m&&<small>{m.score}</small>}</div>})}</div></div>})}

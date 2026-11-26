@@ -20,7 +20,7 @@ import {
   SKILL_KEYS, FOCUS_MAP, INTENSITY, STAFF, COACH_GROWTH, PRIZE, DOUBLES_PRIZE_SHARE, ROUND_ORDER, ROUND_NAME,
   travelCost, LIVING_COST, POTENTIAL_TIERS, POTENTIAL_WEIGHTS, maxPotentialTier, STYLE_CEILING, STYLE_SURFACE, SPECIAL_MAP, PACKS, SKILL_LABEL,
 } from './data';
-import { CARD_LIST, CARD_MAP, CARD_SELL } from './cards';
+import { CARD_LIST, CARD_MAP, CARD_SELL, MATCH_CARD_CHANCE, LOADOUT_SIZE } from './cards';
 import { MILESTONE_MAP, TITLE_COINS, TRINKET_MAP } from './legacy';
 import { rollDecision, turnProDecision, retirementDecision } from './decisions';
 import type { MonthReview, MonthSnapshot, MatchRecord, SlotPlan, Career, CareerFx, Decision, Effects, Intensity, MatchLine, PackTier, Rarity, SkillKey, Skills, StaffKey, Surface, Tour, WeekPlan, WeekReport } from './types';
@@ -214,7 +214,7 @@ export function createCareer(setup: CareerSetup) {
     trinkets: [...setup.trinkets], noInjuryUntilYear: noInj ? START_YEAR + noInj - 1 : 0, seasonReview: null,
     retired: false, legacy: null, seed: rng.seed, uid: 1,
     matchLog: [], tournamentLog: [], unlocks: [], skillLog: [], equipment: [], watched: {},
-    monthStart: null, monthReview: null,
+    monthStart: null, monthReview: null, liveCards: [], liveLocked: false, matchCard: null, liveNotes: [],
   };
   u.career = c;
   u.followedPlayerIds = [p.id];
@@ -407,7 +407,7 @@ export function playWeek(u: any, { live }: { live: boolean }): 'live' | 'done' |
   if (u.liveEvent) {
     const st = liveState(u, u.careerLiveEventId);
     if (!st || !(st.entryIds || []).includes(p.id)) liveFinishAll(u);
-    else { c.live = { eventId: st.eventId }; return 'live'; }
+    else { c.live = { eventId: st.eventId }; c.liveCards = []; c.liveLocked = false; c.matchCard = null; c.liveNotes = []; return 'live'; }
   }
   finishWeek(u);
   return 'done';
@@ -431,8 +431,13 @@ export function careerLive(u: any, mode: 'slot' | 'next' | 'round' | 'finish' | 
       if (!pending.length) break;
       played.push(...livePlay(u, st.eventId, 'slot', pending[0]));
     }
-  } else played = livePlay(u, c.live.eventId, mode, slot) || [];
-  if (!u.liveEvent) { c.live = null; finishWeek(u); }
+  } else {
+    const mine = mode === 'slot' && slot != null && st && myPendingSlot(st, p.id) === slot;
+    if (mine) applyMatchCard(c, p);
+    played = livePlay(u, c.live.eventId, mode, slot) || [];
+    if (mine) { delete p.matchBoost; c.liveLocked = true; }
+  }
+  if (!u.liveEvent) { endLiveCards(c); c.live = null; finishWeek(u); }
   return played;
 }
 export function myPendingSlot(st: any, id: string): number | null {
@@ -446,6 +451,7 @@ export function finishLiveEvent(u: any) {
   const c = careerOf(u);
   if (!u.liveEvent) return;
   liveFinishAll(u);
+  endLiveCards(c);
   c.live = null;
   finishWeek(u);
 }
@@ -910,15 +916,26 @@ export function openPack(u: any, index: number): string[] {
     const total = Object.values(odds).reduce((s, v) => s + v, 0);
     let roll = rng.next() * total, rarity: Rarity = 'common';
     for (const [r, w] of Object.entries(odds)) { roll -= w; if (roll <= 0) { rarity = r as Rarity; break; } }
-    let pool = CARD_LIST.filter((x) => x.rarity === rarity && !(x.kind === 'special' && (c.specials.includes(x.special!))));
+    let pool = CARD_LIST.filter((x) => x.kind !== 'match' && x.rarity === rarity && !(x.kind === 'special' && (c.specials.includes(x.special!))));
     // drills lean toward your weakest skills
-    if (!pool.length) pool = CARD_LIST.filter((x) => x.rarity === 'common');
+    if (!pool.length) pool = CARD_LIST.filter((x) => x.kind !== 'match' && x.rarity === 'common');
     const weights = pool.map((x) => (x.kind === 'drill' && x.skills ? 1 + Object.keys(x.skills).reduce((s, k) => s + Math.max(0, c.ceiling[k as SkillKey] - c.base[k as SkillKey]), 0) / 15 : 1.4) * (x.kind === 'special' ? 0.5 : 1) * (x.kind === 'money' && p.ranking < 50 ? 0.4 : 1));
     const tw = weights.reduce((s, v) => s + v, 0);
     let w = rng.next() * tw, pick = pool[0];
     for (let j = 0; j < pool.length; j += 1) { w -= weights[j]; if (w <= 0) { pick = pool[j]; break; } }
     got.push(pick.id);
     addCard(c, pick.id);
+  }
+  // bonus match card: better packs give it more often, at their own rarity odds
+  if (rng.next() < (MATCH_CARD_CHANCE[tier] ?? 0)) {
+    const total = Object.values(odds).reduce((s, v) => s + v, 0);
+    let roll = rng.next() * total, rarity: Rarity = 'common';
+    for (const [r, w] of Object.entries(odds)) { roll -= w; if (roll <= 0) { rarity = r as Rarity; break; } }
+    const order: Rarity[] = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+    let pool: typeof CARD_LIST = [];
+    for (let k = order.indexOf(rarity); k < order.length && !pool.length; k += 1) pool = CARD_LIST.filter((x) => x.kind === 'match' && x.rarity === order[k]);
+    const pick = pool[Math.floor(rng.next() * pool.length)];
+    if (pick) { got.push(pick.id); addCard(c, pick.id); }
   }
   saveRng(c, rng);
   return got;
@@ -937,11 +954,54 @@ export function sellCard(u: any, uid: string) {
   const c = careerOf(u); const i = c.hand.findIndex((h) => h.uid === uid); if (i < 0) return;
   const def = CARD_MAP[c.hand[i].id]; c.money += CARD_SELL[def?.rarity ?? 'common']; c.hand.splice(i, 1);
 }
+// ---------------------------------------------------------------------------
+// Match cards: a loadout of up to 3 per tournament, one used per match
+// ---------------------------------------------------------------------------
+/** Sets the tournament loadout (before your first match). Cards move from the hand into the loadout. */
+export function setLoadout(u: any, uids: string[]): string | null {
+  const c = careerOf(u);
+  if (!c.live) return 'No tournament in progress';
+  if (c.liveLocked) return 'Your loadout is locked once your first match is played';
+  const pool = [...c.hand, ...c.liveCards];
+  const want = [...new Set(uids)].slice(0, LOADOUT_SIZE).map((id) => pool.find((h) => h.uid === id)).filter((h): h is NonNullable<typeof h> => !!h && CARD_MAP[h.id]?.kind === 'match');
+  c.hand = [...c.hand.filter((h) => !want.includes(h)), ...c.liveCards.filter((h) => !want.includes(h))];
+  c.liveCards = want;
+  if (c.matchCard && !want.some((h) => h.uid === c.matchCard!.uid)) c.matchCard = null;
+  return null;
+}
+/** Queues a loadout card for your next match (or clears it with null). */
+export function queueMatchCard(u: any, uid: string | null, set = -1): string | null {
+  const c = careerOf(u);
+  if (!c.live) return 'No tournament in progress';
+  if (uid == null) { c.matchCard = null; return null; }
+  const h = c.liveCards.find((x) => x.uid === uid); if (!h) return 'That card is not in your loadout';
+  const def = CARD_MAP[h.id];
+  c.matchCard = { uid, set: def?.setPick ? Math.max(0, set) : -1 };
+  return null;
+}
+function applyMatchCard(c: Career, p: any) {
+  const q = c.matchCard; c.matchCard = null;
+  if (!q) return;
+  const i = c.liveCards.findIndex((h) => h.uid === q.uid); if (i < 0) return;
+  const def = CARD_MAP[c.liveCards[i].id]; c.liveCards.splice(i, 1);
+  if (!def) return;
+  if (def.fatigue) p.fatigue = clamp((p.fatigue || 0) + def.fatigue, 0, 100);
+  if (def.confidence) p.confidence = clamp((p.confidence || 0) + def.confidence, -10, 10);
+  if (def.matchEdge) p.matchBoost = { edge: def.matchEdge, set: def.setPick ? q.set : -1 };
+  c.liveNotes.push(`${def.icon} ${def.name}${def.setPick ? ` (set ${q.set + 1})` : ''}`);
+}
+/** Unused loadout cards go back to the hand when the tournament ends. */
+function endLiveCards(c: Career) {
+  const back = c.liveCards; c.liveCards = []; c.matchCard = null; c.liveLocked = false;
+  for (const h of back) addCard(c, h.id);
+}
+
 export function canPlay(u: any, uid: string): string | null {
   const c = careerOf(u), p = me(u);
   const h = c.hand.find((x) => x.uid === uid); if (!h) return 'Card not found';
   const def = CARD_MAP[h.id]; if (!def) return 'Unknown card';
   if (c.cardPlays <= 0) return 'No card plays left this week';
+  if (def.kind === 'match') return 'Match cards are used in tournaments: pick it in your loadout when your tournament starts';
   if (def.kind === 'boost' && c.boost) return 'A boost is already active';
   if (def.kind === 'recovery' && def.heal && !p.injury) return 'You are not injured';
   if (def.kind === 'special' && c.specials.includes(def.special!)) return 'Already unlocked';
